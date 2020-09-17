@@ -208,6 +208,9 @@ class RteProcessor(DataProcessor):
                             examples_neg.append(
                                 InputExample(guid='base', text_a=ex_i, text_b=ex_j, label='neg',  test_class = class_name, gold_class = class_name))
         examples_neg = random.sample(examples_neg, len(examples_pos))
+
+        examples_pos = examples_pos[:200]
+        examples_neg = examples_neg[:200]
         print('examples_pos size:', len(examples_pos), ' examples_neg size:', len(examples_neg))
         return examples_pos+ examples_neg, class2example_list
 
@@ -559,8 +562,14 @@ def main():
 
 
     base_example_size = 0
-    for _, ex_list in class2example_list.items():
-        base_example_size+=len(ex_list)
+
+    new_class2example_list = {}
+    for class_i, ex_list in class2example_list.items():
+        truncate_ex_list = ex_list[:3]
+        new_class2example_list[class_i] = truncate_ex_list
+        base_example_size+=len(truncate_ex_list)
+
+    class2example_list = new_class2example_list
     base_dev_examples = processor.load_Base_dev_or_test('/export/home/Dataset/incrementalFewShotTextClassification/base_val.txt', class2example_list)
     base_test_examples = processor.load_Base_dev_or_test('/export/home/Dataset/incrementalFewShotTextClassification/base_test.txt', class2example_list)
     label_list = ["pos", "neg"]
