@@ -555,7 +555,7 @@ def main():
 
 
     base_example_size = 0
-    for class, ex_list in class2example_list.items():
+    for _, ex_list in class2example_list.items():
         base_example_size+=len(ex_list)
     base_dev_examples = processor.load_Base_dev_or_test('/export/home/Dataset/incrementalFewShotTextClassification/base_val.txt', class2example_list)
     base_test_examples = processor.load_Base_dev_or_test('/export/home/Dataset/incrementalFewShotTextClassification/base_test.txt', class2example_list)
