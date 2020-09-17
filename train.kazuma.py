@@ -191,6 +191,8 @@ class RteProcessor(DataProcessor):
                     if i != j:
                         examples_pos.append(
                             InputExample(guid='base', text_a=valuelist[i], text_b=valuelist[j], label='pos', test_class = key, gold_class = key))
+
+        print('examples_pos size:', len(examples_pos))
         '''neg pairs'''
         examples_neg=[]
         class_list = list(class2example_list.keys())
