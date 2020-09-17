@@ -359,15 +359,6 @@ def convert_examples_to_features(examples, label_list, class_list, max_seq_lengt
         else:
             raise KeyError(output_mode)
 
-        # if ex_index < 5:
-        #     logger.info("*** Example ***")
-        #     logger.info("guid: %s" % (example.guid))
-        #     logger.info("tokens: %s" % " ".join(
-        #             [str(x) for x in tokens]))
-        #     logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-        #     logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-        #     logger.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-        #     logger.info("label: %s (id = %d)" % (example.label, label_id))
 
         features.append(
                 InputFeatures(input_ids=input_ids,
@@ -375,7 +366,7 @@ def convert_examples_to_features(examples, label_list, class_list, max_seq_lengt
                               segment_ids=segment_ids,
                               label_id=label_id,
                               test_class_id = class_map[example.test_class],
-                              gold_class_id = class_map[example.gold_class])
+                              gold_class_id = class_map[example.gold_class]))
     return features
 
 def _truncate_seq_pair(tokens_a, tokens_b, max_length):
@@ -744,7 +735,7 @@ if __name__ == "__main__":
 
 '''
 
-CUDA_VISIBLE_DEVICES=6 python -u pretrain.on.MNLI.py --task_name rte --do_train --do_lower_case --num_train_epochs 20 --train_batch_size 32 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 128 --seed 42
+CUDA_VISIBLE_DEVICES=2 python -u train.kazuma.py --task_name rte --do_train --do_lower_case --num_train_epochs 20 --train_batch_size 32 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 128 --seed 42
 
 
 '''
