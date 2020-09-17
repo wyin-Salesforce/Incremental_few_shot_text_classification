@@ -172,6 +172,7 @@ class RteProcessor(DataProcessor):
         line_co=0
         for row in readfile:
             parts = row.strip().split('\t')
+            print('parts:', parts)
             class_name = parts[0]
             sent_list = class2example_list.get(class_name)
             if sent_list is None:
