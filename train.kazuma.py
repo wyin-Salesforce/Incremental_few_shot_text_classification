@@ -576,6 +576,7 @@ def main():
     base_test_examples = processor.load_Base_dev_or_test('/export/home/Dataset/incrementalFewShotTextClassification/base_test.txt', class2example_list)
     label_list = ["pos", "neg"]
     class_list = load_class_names()
+    print('class_list:', class_list, class_list.index('ood'))
     num_labels = len(label_list)
     print('num_labels:', num_labels, 'base training size:', len(base_train_examples), 'base dev size:', len(base_dev_examples), 'base test size:', len(base_test_examples))
 
