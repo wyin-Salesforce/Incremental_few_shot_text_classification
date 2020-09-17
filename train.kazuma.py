@@ -420,8 +420,10 @@ def examples_to_features(source_examples, label_list, class_list,  args, tokeniz
     dev_all_input_mask = torch.tensor([f.input_mask for f in source_features], dtype=torch.long)
     dev_all_segment_ids = torch.tensor([f.segment_ids for f in source_features], dtype=torch.long)
     dev_all_label_ids = torch.tensor([f.label_id for f in source_features], dtype=torch.long)
+    dev_all_test_class_ids = torch.tensor([f.test_class_id for f in source_features], dtype=torch.long)
+    dev_all_gold_class_ids = torch.tensor([f.gold_class_id for f in source_features], dtype=torch.long)
 
-    dev_data = TensorDataset(dev_all_input_ids, dev_all_input_mask, dev_all_segment_ids, dev_all_label_ids)
+    dev_data = TensorDataset(dev_all_input_ids, dev_all_input_mask, dev_all_segment_ids, dev_all_label_ids, dev_all_test_class_ids, dev_all_gold_class_ids)
     if dataloader_mode=='sequential':
         dev_sampler = SequentialSampler(dev_data)
     else:
