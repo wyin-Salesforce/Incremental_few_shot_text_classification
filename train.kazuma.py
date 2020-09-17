@@ -560,7 +560,7 @@ def main():
     processor = processors[task_name]()
     output_mode = output_modes[task_name]
     class_list = load_class_names()
-    print('class_list:', class_list, class_list.index('ood'))
+    print('class_list:', class_list)
     base_train_examples, class2example_list = processor.load_Base_train('/export/home/Dataset/incrementalFewShotTextClassification/base_train.txt')
 
 
