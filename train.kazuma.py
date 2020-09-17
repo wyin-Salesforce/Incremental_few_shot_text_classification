@@ -172,13 +172,14 @@ class RteProcessor(DataProcessor):
         line_co=0
         for row in readfile:
             parts = row.strip().split('\t')
-            print('parts:', parts)
+            # print('parts:', parts)
             class_name = parts[0]
             sent_list = class2example_list.get(class_name)
             if sent_list is None:
                 sent_list = []
             sent = parts[1].strip()
             sent_list.append(sent)
+            class2example_list[class_name] = sent_list
         class_size = len(class2example_list)
         '''now build pos and neg pairs'''
         '''pos pairs'''
