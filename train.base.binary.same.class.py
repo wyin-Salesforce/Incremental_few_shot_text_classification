@@ -638,14 +638,14 @@ def main():
             nb_tr_examples, nb_tr_steps = 0, 0
             for step, batch in enumerate(tqdm(base_train_dataloader, desc="Iteration")):
                 model.train()
-                batch = tuple(t.to(device) for t in batch)
-                input_ids, input_mask, segment_ids, label_ids, _, _ = batch
+                # batch = tuple(t.to(device) for t in batch)
+                input_ids, input_mask, _, label_ids, _, _ = batch
 
 
-                logits = model(input_ids, input_mask)
+                logits = model(input_ids.to(device), input_mask.to(device))
                 loss_fct = CrossEntropyLoss()
 
-                loss = loss_fct(logits.view(-1, num_labels), label_ids.view(-1))
+                loss = loss_fct(logits.view(-1, num_labels), label_ids.to(device).view(-1))
 
                 if n_gpu > 1:
                     loss = loss.mean() # mean() to average on multi-gpu.
