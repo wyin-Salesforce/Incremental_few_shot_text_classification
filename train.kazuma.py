@@ -670,7 +670,9 @@ def main():
                 all_hypo_class_ids = []
                 all_premise_class_ids = []
                 # print('Evaluating...')
-                for input_ids, input_mask, segment_ids, label_ids, test_class_ids, gold_class_ids in dev_or_test_dataloader:
+                for _, batch in enumerate(tqdm(dev_or_test_dataloader, desc="evaluating")):
+                    input_ids, input_mask, segment_ids, label_ids, test_class_ids, gold_class_ids = batch
+                    # for input_ids, input_mask, segment_ids, label_ids, test_class_ids, gold_class_ids in dev_or_test_dataloader:
                     input_ids = input_ids.to(device)
                     input_mask = input_mask.to(device)
                     segment_ids = segment_ids.to(device)
