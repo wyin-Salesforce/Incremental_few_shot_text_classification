@@ -653,7 +653,7 @@ if __name__ == "__main__":
 
 '''
 
-CUDA_VISIBLE_DEVICES=3 python -u train.base.binary.same.class.py --task_name rte --do_train --do_lower_case --num_train_epochs 3 --train_batch_size 20 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 128 --seed 42
+CUDA_VISIBLE_DEVICES=4 python -u train.round.1.py --task_name rte --do_train --do_lower_case --num_train_epochs 3 --train_batch_size 20 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 128 --seed 42
 
 
 '''
