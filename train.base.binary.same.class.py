@@ -638,14 +638,14 @@ def main():
             nb_tr_examples, nb_tr_steps = 0, 0
             for step, batch in enumerate(tqdm(base_train_dataloader, desc="Iteration")):
                 model.train()
-                # batch = tuple(t.to(device) for t in batch)
-                input_ids, input_mask, _, label_ids, _, _ = batch
+                batch = tuple(t.to(device) for t in batch)
+                input_ids, input_mask, segment_ids, label_ids, _, _ = batch
 
 
-                logits = model(input_ids.to(device), input_mask.to(device))
+                logits = model(input_ids, input_mask)
                 loss_fct = CrossEntropyLoss()
 
-                loss = loss_fct(logits.view(-1, num_labels), label_ids.to(device).view(-1))
+                loss = loss_fct(logits.view(-1, num_labels), label_ids.view(-1))
 
                 if n_gpu > 1:
                     loss = loss.mean() # mean() to average on multi-gpu.
@@ -675,7 +675,7 @@ if __name__ == "__main__":
 
 '''
 
-CUDA_VISIBLE_DEVICES=3 python -u train.base.binary.same.class.py --task_name rte --do_train --do_lower_case --num_train_epochs 3 --train_batch_size 16 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 128 --seed 42
+CUDA_VISIBLE_DEVICES=3 python -u train.base.binary.same.class.py --task_name rte --do_train --do_lower_case --num_train_epochs 3 --train_batch_size 20 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 128 --seed 42
 
 
 '''
