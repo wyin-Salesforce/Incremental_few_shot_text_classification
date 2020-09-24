@@ -108,7 +108,7 @@ class RobertaClassificationHead(nn.Module):
 class InputExample(object):
     """A single training/test example for simple sequence classification."""
 
-    def __init__(self, guid, text_a, text_b=None, label=None, test_class=None, gold_class=None):
+    def __init__(self, guid, text_a, text_b=None, label=None, hypo_class=None, premise_class=None):
         """Constructs a InputExample.
 
         Args:
@@ -124,8 +124,8 @@ class InputExample(object):
         self.text_a = text_a
         self.text_b = text_b
         self.label = label
-        self.test_class = test_class
-        self.gold_class = gold_class
+        self.hypo_class = test_class
+        self.premise_class = premise_class
 
 
 class InputFeatures(object):
@@ -173,7 +173,7 @@ class RteProcessor(DataProcessor):
         for row in readfile:
             parts = row.strip().split('\t')
             # print('parts:', parts)
-            class_name = parts[0]
+            class_name = parts[0].strip()
             sent_list = class2example_list.get(class_name)
             if sent_list is None:
                 sent_list = []
@@ -189,33 +189,34 @@ class RteProcessor(DataProcessor):
             for i in range(value_size):
                 for j in range(value_size):
                     if i != j:
+                        # they can be exchanged, but can not be the same
                         examples_pos.append(
-                            InputExample(guid='base', text_a=valuelist[i], text_b=valuelist[j], label='pos', test_class = key, gold_class = key))
+                            InputExample(guid='base', text_a=valuelist[i], text_b=valuelist[j], label='pos', hypo_class = key, premise_class = key))
 
         print('examples_pos size:', len(examples_pos))
-        '''neg pairs'''
+        '''neg pairs, we keep the same size of the pos pairs'''
         examples_neg=[]
-        class_list = list(class2example_list.keys())
-        class_size = len(class_list)
-        for i in range(class_size):
-            class_name = class_list[i]
-            examples_from_i = class2example_list.get(class_list[i])
-            for j in range(class_size):
-                examples_from_j = class2example_list.get(class_list[j])
-                if i != j:
-                    for ex_i in examples_from_i:
-                        for ex_j in examples_from_j:
-                            examples_neg.append(
-                                InputExample(guid='base', text_a=ex_i, text_b=ex_j, label='neg',  test_class = class_name, gold_class = class_name))
-        examples_neg = random.sample(examples_neg, len(examples_pos))
+        for class_i, ex_list in class2example_list.items():
+            other_ex_list = []
+            for class_j, ex_list_j in class2example_list.items():
+                if class_i != class_j:
+                    other_ex_list+=ex_list_j
+            other_ex_list = random.sample(other_ex_list, len(ex_list))
+            for ex_i in ex_list:
+                for ex_j in other_ex_list:
+                    examples_neg.append(
+                        InputExample(guid='base', text_a=ex_i, text_b=ex_j, label='neg',  hypo_class = class_i, premise_class = class_i))
+                    examples_neg.append(
+                        InputExample(guid='base', text_a=ex_j, text_b=ex_i, label='neg',  hypo_class = class_i, premise_class = class_i))
 
-        examples_pos = examples_pos[:200]
-        examples_neg = examples_neg[:200]
+
+        # examples_pos = examples_pos[:200]
+        # examples_neg = examples_neg[:200]
         print('examples_pos size:', len(examples_pos), ' examples_neg size:', len(examples_neg))
         return examples_pos+ examples_neg, class2example_list
 
 
-    def load_Base_dev_or_test(self, filename, base_class2example_list):
+    def load_Base_dev_or_test(self, filename, base_class2example_list, class_2_ood):
         '''
         classes: ["entailment", "neutral", "contradiction"]
         '''
@@ -225,13 +226,14 @@ class RteProcessor(DataProcessor):
         line_co=0
         for row in readfile:
             parts = row.strip().split('\t')
-            gold_class = parts[0]
-            sent = parts[1]
+            gold_class = class_2_ood.get(parts[0].strip())
+            sent = parts[1].strip()
             '''this sent compares with all base examples'''
             for test_class, ex_list in base_class2example_list.items():
+                test_class = class_2_ood.get(test_class)
                 for ex in ex_list:
                     examples.append(
-                        InputExample(guid='base', text_a=sent, text_b=ex, label='neg', test_class = test_class, gold_class = gold_class))
+                        InputExample(guid='base', text_a=sent, text_b=ex, label='neg', hypo_class = test_class, premise_class = gold_class))
 
         print('examples size:', len(examples))
         return examples
@@ -398,10 +400,16 @@ def _truncate_seq_pair(tokens_a, tokens_b, max_length):
 def load_class_names():
     readfile = codecs.open('/export/home/Dataset/incrementalFewShotTextClassification/category_split.txt', 'r', 'utf-8')
     class_list = set()
+    class_2_ood = {}
     for line in readfile:
-        class_list.add(line.strip().split('\t')[1])
+        class_i = line.strip().split('\t')[1]
+        class_2_ood[class_i] = class_i
+        if line.strip().split('\t')[0] == 'ood':
+            class_2_ood[class_i] = 'ood'
+            class_i = 'ood'
+        class_list.add(class_i)
     print('class_list size:', len(class_list))
-    return list(class_list)
+    return list(class_list), class_2_ood
 
 
 def examples_to_features(source_examples, label_list, class_list,  args, tokenizer, batch_size, output_mode, dataloader_mode='sequential'):
@@ -559,22 +567,22 @@ def main():
 
     processor = processors[task_name]()
     output_mode = output_modes[task_name]
-    class_list = load_class_names()
+    class_list, class_2_ood = load_class_names()
     print('class_list:', class_list)
-    base_train_examples, class2example_list = processor.load_Base_train('/export/home/Dataset/incrementalFewShotTextClassification/base_train.txt')
+    base_train_examples, base_class2example_list = processor.load_Base_train('/export/home/Dataset/incrementalFewShotTextClassification/base_train.txt')
 
 
-    base_example_size = 0
+    base_truncate_example_size = 0
 
-    new_class2example_list = {}
-    for class_i, ex_list in class2example_list.items():
-        truncate_ex_list = ex_list[:3]
-        new_class2example_list[class_i] = truncate_ex_list
-        base_example_size+=len(truncate_ex_list)
+    base_selected_class2example_list = {}
+    for class_i, ex_list in base_class2example_list.items():
+        truncate_ex_list = random.sample(ex_list, 3)
+        base_selected_class2example_list[class_i] = truncate_ex_list
+        base_truncate_example_size+=len(truncate_ex_list)
 
-    class2example_list = new_class2example_list
-    base_dev_examples = processor.load_Base_dev_or_test('/export/home/Dataset/incrementalFewShotTextClassification/base_val.txt', class2example_list)
-    base_test_examples = processor.load_Base_dev_or_test('/export/home/Dataset/incrementalFewShotTextClassification/base_test.txt', class2example_list)
+    # class2example_list = new_class2example_list
+    base_dev_examples = processor.load_Base_dev_or_test('/export/home/Dataset/incrementalFewShotTextClassification/base_val.txt', base_selected_class2example_list, class_2_ood)
+    base_test_examples = processor.load_Base_dev_or_test('/export/home/Dataset/incrementalFewShotTextClassification/base_test.txt', base_selected_class2example_list, class_2_ood)
     label_list = ["pos", "neg"]
 
     num_labels = len(label_list)
@@ -660,8 +668,8 @@ def main():
                 nb_eval_steps = 0
                 preds = []
                 gold_label_ids = []
-                all_test_class_ids = []
-                all_gold_class_ids = []
+                all_hypo_class_ids = []
+                all_premise_class_ids = []
                 # print('Evaluating...')
                 for input_ids, input_mask, segment_ids, label_ids, test_class_ids, gold_class_ids in dev_or_test_dataloader:
                     input_ids = input_ids.to(device)
@@ -669,8 +677,8 @@ def main():
                     segment_ids = segment_ids.to(device)
                     label_ids = label_ids.to(device)
                     gold_label_ids+=list(label_ids.detach().cpu().numpy())
-                    all_test_class_ids+=list(test_class_ids.detach().cpu().numpy())
-                    all_gold_class_ids+=list(gold_class_ids.detach().cpu().numpy())
+                    all_hypo_class_ids+=list(test_class_ids.detach().cpu().numpy())
+                    all_premise_class_ids+=list(gold_class_ids.detach().cpu().numpy())
 
 
                     with torch.no_grad():
@@ -690,49 +698,59 @@ def main():
 
                 pred_probs = softmax(preds,axis=1)
                 pos_probs = list(pred_probs[:, 0])
-                assert len(pos_probs) == len(all_test_class_ids)
-                assert len(pos_probs) == len(all_gold_class_ids)
-                assert len(pos_probs)%base_example_size == 0
-                test_instance_size = len(pos_probs)//base_example_size
+                assert len(pos_probs) == len(all_hypo_class_ids)
+                assert len(pos_probs) == len(all_premise_class_ids)
+                assert len(pos_probs)%base_truncate_example_size == 0
+                test_instance_size = len(pos_probs)//base_truncate_example_size
+                if idd ==0:
+                    assert test_instance_size ==  len(base_dev_examples)
+                else:
+                    assert test_instance_size ==  len(base_test_examples)
+
+                '''for each test example'''
+                # for each_test_id in range(test_instance_size):
+
+
                 hit_ood_co = 0
                 hit_kd_co = 0
                 total_ood_co = 0
                 total_kd_co =0
                 for each_test_id in range(test_instance_size):
-                    gold_class = set(all_gold_class_ids[each_test_id*base_example_size: (each_test_id+1)*base_example_size])
-                    assert len(gold_class) == 1
-                    gold_class = list(gold_class)[0]
+                    gold_class_set = set(all_premise_class_ids[each_test_id*base_truncate_example_size: (each_test_id+1)*base_truncate_example_size])
+                    assert len(gold_class_set) == 1
+                    gold_class = list(gold_class)[0] # can be in the base or ood
 
-                    sub_pos_probs = pos_probs[each_test_id*base_example_size: (each_test_id+1)*base_example_size]
-                    sub_test_class_ids = all_test_class_ids[each_test_id*base_example_size: (each_test_id+1)*base_example_size]
+                    sub_pos_probs = pos_probs[each_test_id*base_truncate_example_size: (each_test_id+1)*base_truncate_example_size]
+                    sub_hypo_class_ids = all_hypo_class_ids[each_test_id*base_truncate_example_size: (each_test_id+1)*base_truncate_example_size]
 
-                    test_class_2_problist = {}
-                    for i in range(base_example_size):
-                        test_class_i = sub_test_class_ids[i]
-                        problist = test_class_2_problist.get(test_class_i)
+                    hypo_class_2_problist = {}
+                    for i in range(base_truncate_example_size):
+                        hypo_class_i = sub_hypo_class_ids[i]
+                        problist = hypo_class_2_problist.get(hypo_class_i)
                         if problist is None:
                             problist = []
                         problist.append(sub_pos_probs[i])
-                        test_class_2_problist[test_class_i] = problist
+                        hypo_class_2_problist[hypo_class_i] = problist
 
+                    '''find the base class with max prob'''
                     final_pred_class = -1
                     max_prob = 0.0
-                    for test_class_i, problist  in test_class_2_problist.items():
+                    for hypo_class_i, problist  in hypo_class_2_problist.items():
                         mean_prob = np.mean(problist)
                         if mean_prob > max_prob:
                             max_prob = mean_prob
-                            final_pred_class = test_class_i
+                            final_pred_class = hypo_class_i
 
                     if max_prob < 0.5:
                         #00d
                         final_pred_class = class_list.index('ood')
 
 
+                    '''compute acc'''
                     if gold_class == class_list.index('ood'):
                         total_ood_co+=1
                     else:
                         total_kd_co+=1
-
 
                     if final_pred_class == gold_class:
                         if gold_class == class_list.index('ood'):
@@ -742,8 +760,10 @@ def main():
 
                 acc_ood = hit_ood_co/total_ood_co
                 acc_kd = hit_kd_co/total_kd_co
-
-                print('acc_kd:', acc_kd, 'acc_ood:', acc_ood)
+                if idd == 0:
+                    print(' dev: acc_kd:', acc_kd, 'acc_ood:', acc_ood)
+                else:
+                    print(' test: acc_kd:', acc_kd, 'acc_ood:', acc_ood)
 
 
 if __name__ == "__main__":
