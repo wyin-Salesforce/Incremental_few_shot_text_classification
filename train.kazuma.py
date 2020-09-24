@@ -575,7 +575,7 @@ def main():
 
     base_selected_class2example_list = {}
     for class_i, ex_list in base_class2example_list.items():
-        truncate_ex_list = random.sample(ex_list, 3)
+        truncate_ex_list = random.sample(ex_list, 1)
         base_selected_class2example_list[class_i] = truncate_ex_list
         base_truncate_example_size+=len(truncate_ex_list)
 
@@ -704,9 +704,9 @@ def main():
                 assert len(pos_probs)%base_truncate_example_size == 0
                 test_instance_size = len(pos_probs)//base_truncate_example_size
                 if idd ==0:
-                    assert test_instance_size ==  len(base_dev_examples)
+                    assert test_instance_size ==  len(base_dev_examples)//base_truncate_example_size
                 else:
-                    assert test_instance_size ==  len(base_test_examples)
+                    assert test_instance_size ==  len(base_test_examples)//base_truncate_example_size
 
                 '''for each test example'''
                 # for each_test_id in range(test_instance_size):
@@ -759,8 +759,8 @@ def main():
                         else:
                             hit_kd_co+=1
 
-                acc_ood = hit_ood_co/total_ood_co
-                acc_kd = hit_kd_co/total_kd_co
+                acc_ood = hit_ood_co/(1e-8+total_ood_co)
+                acc_kd = hit_kd_co/(1e-8+total_kd_co)
                 if idd == 0:
                     print(' dev: acc_kd:', acc_kd, 'acc_ood:', acc_ood)
                 else:
