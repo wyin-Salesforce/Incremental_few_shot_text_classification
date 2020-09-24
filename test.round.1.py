@@ -792,6 +792,7 @@ def main():
                 exit(0)
 
 
+        print('hit_co:', hit_co, 'total_co:', total_co)
         acc_list = [hit_co[i]/(1e-8+total_co[i])  for i in range(3)]
         print('acc_list:', acc_list)
 
