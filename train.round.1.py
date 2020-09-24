@@ -563,11 +563,11 @@ def main():
 
     base_truncate_example_size = 0
 
-    base_selected_class2example_list = {}
-    for class_i, ex_list in base_class2example_list.items():
-        truncate_ex_list = random.sample(ex_list, 5)
-        base_selected_class2example_list[class_i] = truncate_ex_list
-        base_truncate_example_size+=len(truncate_ex_list)
+    # base_selected_class2example_list = {}
+    # for class_i, ex_list in base_class2example_list.items():
+    #     truncate_ex_list = random.sample(ex_list, 5)
+    #     base_selected_class2example_list[class_i] = truncate_ex_list
+    #     base_truncate_example_size+=len(truncate_ex_list)
 
     # class2example_list = new_class2example_list
     # base_dev_examples = processor.load_Base_dev_or_test('/export/home/Dataset/incrementalFewShotTextClassification/base_val.txt', base_selected_class2example_list, class_2_ood)
