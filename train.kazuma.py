@@ -227,6 +227,7 @@ class RteProcessor(DataProcessor):
             gold_class = class_2_ood.get(parts[0].strip())
             sent = parts[1].strip()
             '''this sent compares with all base examples'''
+            print('each test example compares with', len(base_class2example_list.keys()), ' base classes')
             for test_class, ex_list in base_class2example_list.items():
                 test_class = class_2_ood.get(test_class)
                 for ex in ex_list:
