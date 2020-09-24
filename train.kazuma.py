@@ -208,8 +208,8 @@ class RteProcessor(DataProcessor):
                         InputExample(guid='base', text_a=ex_i, text_b=ex_j, label='neg',  hypo_class = class_i, premise_class = class_i))
 
 
-        # examples_pos = examples_pos[:200]
-        # examples_neg = examples_neg[:200]
+        examples_pos = examples_pos[:200]
+        examples_neg = examples_neg[:200]
         print('examples_pos size:', len(examples_pos), ' examples_neg size:', len(examples_neg))
         return examples_pos+ examples_neg, class2example_list
 
