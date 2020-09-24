@@ -208,8 +208,8 @@ class RteProcessor(DataProcessor):
                         InputExample(guid='base', text_a=ex_i, text_b=ex_j, label='neg',  hypo_class = class_i, premise_class = class_i))
 
 
-        examples_pos = examples_pos[:200]
-        examples_neg = examples_neg[:200]
+        # examples_pos = examples_pos[:200]
+        # examples_neg = examples_neg[:200]
         print('examples_pos size:', len(examples_pos), ' examples_neg size:', len(examples_neg))
         return examples_pos+ examples_neg, class2example_list
 
@@ -575,7 +575,7 @@ def main():
 
     base_selected_class2example_list = {}
     for class_i, ex_list in base_class2example_list.items():
-        truncate_ex_list = random.sample(ex_list, 1)
+        truncate_ex_list = random.sample(ex_list, 5)
         base_selected_class2example_list[class_i] = truncate_ex_list
         base_truncate_example_size+=len(truncate_ex_list)
 
@@ -651,120 +651,121 @@ def main():
                 global_step += 1
                 iter_co+=1
 
-            '''
-            start evaluate on dev set after this epoch
-            '''
-            model.eval()
-            logger.info("***** Running dev *****")
-            logger.info("  Num examples = %d", len(base_dev_examples))
+                if iter_co % 1000 == 0:
+                '''
+                start evaluate on dev set after this epoch
+                '''
+                    model.eval()
+                    logger.info("***** Running dev *****")
+                    logger.info("  Num examples = %d", len(base_dev_examples))
 
 
 
-            for idd, dev_or_test_dataloader in enumerate([base_dev_dataloader, base_test_dataloader]):
+                    for idd, dev_or_test_dataloader in enumerate([base_dev_dataloader, base_test_dataloader]):
 
 
-                eval_loss = 0
-                nb_eval_steps = 0
-                preds = []
-                gold_label_ids = []
-                all_hypo_class_ids = []
-                all_premise_class_ids = []
-                # print('Evaluating...')
-                for _, batch in enumerate(tqdm(dev_or_test_dataloader, desc="evaluating")):
-                    input_ids, input_mask, segment_ids, label_ids, test_class_ids, gold_class_ids = batch
-                    # for input_ids, input_mask, segment_ids, label_ids, test_class_ids, gold_class_ids in dev_or_test_dataloader:
-                    input_ids = input_ids.to(device)
-                    input_mask = input_mask.to(device)
-                    segment_ids = segment_ids.to(device)
-                    label_ids = label_ids.to(device)
-                    gold_label_ids+=list(label_ids.detach().cpu().numpy())
-                    all_hypo_class_ids+=list(test_class_ids.detach().cpu().numpy())
-                    all_premise_class_ids+=list(gold_class_ids.detach().cpu().numpy())
+                        eval_loss = 0
+                        nb_eval_steps = 0
+                        preds = []
+                        gold_label_ids = []
+                        all_hypo_class_ids = []
+                        all_premise_class_ids = []
+                        # print('Evaluating...')
+                        for _, batch in enumerate(tqdm(dev_or_test_dataloader, desc="evaluating")):
+                            input_ids, input_mask, segment_ids, label_ids, test_class_ids, gold_class_ids = batch
+                            # for input_ids, input_mask, segment_ids, label_ids, test_class_ids, gold_class_ids in dev_or_test_dataloader:
+                            input_ids = input_ids.to(device)
+                            input_mask = input_mask.to(device)
+                            segment_ids = segment_ids.to(device)
+                            label_ids = label_ids.to(device)
+                            gold_label_ids+=list(label_ids.detach().cpu().numpy())
+                            all_hypo_class_ids+=list(test_class_ids.detach().cpu().numpy())
+                            all_premise_class_ids+=list(gold_class_ids.detach().cpu().numpy())
 
 
-                    with torch.no_grad():
-                        logits = model(input_ids, input_mask)
+                            with torch.no_grad():
+                                logits = model(input_ids, input_mask)
 
-                    '''combine with logits from source domain'''
-                    # print('logits:', logits)
-                    # print('logits_from_source:', logits_from_source)
-                    # weight = 0.9
-                    # logits = weight*logits+(1.0-weight)*torch.sigmoid(logits_from_source)
-                    if len(preds) == 0:
-                        preds.append(logits.detach().cpu().numpy())
-                    else:
-                        preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
+                            '''combine with logits from source domain'''
+                            # print('logits:', logits)
+                            # print('logits_from_source:', logits_from_source)
+                            # weight = 0.9
+                            # logits = weight*logits+(1.0-weight)*torch.sigmoid(logits_from_source)
+                            if len(preds) == 0:
+                                preds.append(logits.detach().cpu().numpy())
+                            else:
+                                preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
 
-                preds = preds[0]
+                        preds = preds[0]
 
-                pred_probs = softmax(preds,axis=1)
-                pos_probs = list(pred_probs[:, 0])
-                assert len(pos_probs) == len(all_hypo_class_ids)
-                assert len(pos_probs) == len(all_premise_class_ids)
-                assert len(pos_probs)%base_truncate_example_size == 0
-                test_instance_size = len(pos_probs)//base_truncate_example_size
-                if idd ==0:
-                    assert test_instance_size ==  len(base_dev_examples)//base_truncate_example_size
-                else:
-                    assert test_instance_size ==  len(base_test_examples)//base_truncate_example_size
-
-                '''for each test example'''
-                # for each_test_id in range(test_instance_size):
-
-
-                hit_ood_co = 0
-                hit_kd_co = 0
-                total_ood_co = 0
-                total_kd_co =0
-                for each_test_id in range(test_instance_size):
-                    gold_class_set = set(all_premise_class_ids[each_test_id*base_truncate_example_size: (each_test_id+1)*base_truncate_example_size])
-                    assert len(gold_class_set) == 1
-                    gold_class = list(gold_class_set)[0] # can be in the base or ood
-
-                    sub_pos_probs = pos_probs[each_test_id*base_truncate_example_size: (each_test_id+1)*base_truncate_example_size]
-                    sub_hypo_class_ids = all_hypo_class_ids[each_test_id*base_truncate_example_size: (each_test_id+1)*base_truncate_example_size]
-
-                    hypo_class_2_problist = {}
-                    for i in range(base_truncate_example_size):
-                        hypo_class_i = sub_hypo_class_ids[i]
-                        problist = hypo_class_2_problist.get(hypo_class_i)
-                        if problist is None:
-                            problist = []
-                        problist.append(sub_pos_probs[i])
-                        hypo_class_2_problist[hypo_class_i] = problist
-
-                    '''find the base class with max prob'''
-                    final_pred_class = -1
-                    max_prob = 0.0
-                    for hypo_class_i, problist  in hypo_class_2_problist.items():
-                        mean_prob = np.mean(problist)
-                        if mean_prob > max_prob:
-                            max_prob = mean_prob
-                            final_pred_class = hypo_class_i
-
-                    if max_prob < 0.5:
-                        #00d
-                        final_pred_class = class_list.index('ood')
-
-
-                    '''compute acc'''
-                    if gold_class == class_list.index('ood'):
-                        total_ood_co+=1
-                    else:
-                        total_kd_co+=1
-
-                    if final_pred_class == gold_class:
-                        if gold_class == class_list.index('ood'):
-                            hit_ood_co +=1
+                        pred_probs = softmax(preds,axis=1)
+                        pos_probs = list(pred_probs[:, 0])
+                        assert len(pos_probs) == len(all_hypo_class_ids)
+                        assert len(pos_probs) == len(all_premise_class_ids)
+                        assert len(pos_probs)%base_truncate_example_size == 0
+                        test_instance_size = len(pos_probs)//base_truncate_example_size
+                        if idd ==0:
+                            assert test_instance_size ==  len(base_dev_examples)//base_truncate_example_size
                         else:
-                            hit_kd_co+=1
+                            assert test_instance_size ==  len(base_test_examples)//base_truncate_example_size
 
-                acc_ood = hit_ood_co/(1e-8+total_ood_co)
-                acc_kd = hit_kd_co/(1e-8+total_kd_co)
-                if idd == 0:
-                    print(' dev: acc_kd:', acc_kd, 'acc_ood:', acc_ood)
-                else:
-                    print(' test: acc_kd:', acc_kd, 'acc_ood:', acc_ood)
+                        '''for each test example'''
+                        # for each_test_id in range(test_instance_size):
+
+
+                        hit_ood_co = 0
+                        hit_kd_co = 0
+                        total_ood_co = 0
+                        total_kd_co =0
+                        for each_test_id in range(test_instance_size):
+                            gold_class_set = set(all_premise_class_ids[each_test_id*base_truncate_example_size: (each_test_id+1)*base_truncate_example_size])
+                            assert len(gold_class_set) == 1
+                            gold_class = list(gold_class_set)[0] # can be in the base or ood
+
+                            sub_pos_probs = pos_probs[each_test_id*base_truncate_example_size: (each_test_id+1)*base_truncate_example_size]
+                            sub_hypo_class_ids = all_hypo_class_ids[each_test_id*base_truncate_example_size: (each_test_id+1)*base_truncate_example_size]
+
+                            hypo_class_2_problist = {}
+                            for i in range(base_truncate_example_size):
+                                hypo_class_i = sub_hypo_class_ids[i]
+                                problist = hypo_class_2_problist.get(hypo_class_i)
+                                if problist is None:
+                                    problist = []
+                                problist.append(sub_pos_probs[i])
+                                hypo_class_2_problist[hypo_class_i] = problist
+
+                            '''find the base class with max prob'''
+                            final_pred_class = -1
+                            max_prob = 0.0
+                            for hypo_class_i, problist  in hypo_class_2_problist.items():
+                                mean_prob = np.mean(problist)
+                                if mean_prob > max_prob:
+                                    max_prob = mean_prob
+                                    final_pred_class = hypo_class_i
+
+                            if max_prob < 0.5:
+                                #00d
+                                final_pred_class = class_list.index('ood')
+
+
+                            '''compute acc'''
+                            if gold_class == class_list.index('ood'):
+                                total_ood_co+=1
+                            else:
+                                total_kd_co+=1
+
+                            if final_pred_class == gold_class:
+                                if gold_class == class_list.index('ood'):
+                                    hit_ood_co +=1
+                                else:
+                                    hit_kd_co+=1
+
+                        acc_ood = hit_ood_co/(1e-8+total_ood_co)
+                        acc_kd = hit_kd_co/(1e-8+total_kd_co)
+                        if idd == 0:
+                            print(' dev: acc_kd:', acc_kd, 'acc_ood:', acc_ood)
+                        else:
+                            print(' test: acc_kd:', acc_kd, 'acc_ood:', acc_ood)
 
 
 if __name__ == "__main__":
