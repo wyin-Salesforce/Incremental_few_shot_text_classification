@@ -208,8 +208,8 @@ class RteProcessor(DataProcessor):
                         InputExample(guid='base', text_a=ex_i, text_b=ex_j, label='neg',  hypo_class = class_i, premise_class = class_i))
 
 
-        # examples_pos = examples_pos[:200]
-        # examples_neg = examples_neg[:200]
+        examples_pos = random.sample(examples_pos, 100000)
+        examples_neg = random.sample(examples_neg, 100000)
         print('examples_pos size:', len(examples_pos), ' examples_neg size:', len(examples_neg))
         return examples_pos+ examples_neg, class2example_list
 
@@ -440,6 +440,18 @@ def examples_to_features(source_examples, label_list, class_list,  args, tokeniz
 
     return dev_dataloader
 
+def store_transformers_models(model, tokenizer, output_dir, flag_str):
+    '''
+    store the model
+    '''
+    output_dir+='/'+flag_str
+    # if not os.path.exists(output_dir):
+    #     os.makedirs(output_dir)
+    print('starting model storing....')
+    # model.save_pretrained(output_dir)
+    torch.save(model.state_dict(), output_dir)
+    # tokenizer.save_pretrained(output_dir)
+    print('store succeed')
 
 def main():
     parser = argparse.ArgumentParser()
@@ -580,12 +592,12 @@ def main():
         base_truncate_example_size+=len(truncate_ex_list)
 
     # class2example_list = new_class2example_list
-    base_dev_examples = processor.load_Base_dev_or_test('/export/home/Dataset/incrementalFewShotTextClassification/base_val.txt', base_selected_class2example_list, class_2_ood)
-    base_test_examples = processor.load_Base_dev_or_test('/export/home/Dataset/incrementalFewShotTextClassification/base_test.txt', base_selected_class2example_list, class_2_ood)
+    # base_dev_examples = processor.load_Base_dev_or_test('/export/home/Dataset/incrementalFewShotTextClassification/base_val.txt', base_selected_class2example_list, class_2_ood)
+    # base_test_examples = processor.load_Base_dev_or_test('/export/home/Dataset/incrementalFewShotTextClassification/base_test.txt', base_selected_class2example_list, class_2_ood)
     label_list = ["pos", "neg"]
 
     num_labels = len(label_list)
-    print('num_labels:', num_labels, 'base training size:', len(base_train_examples), 'base dev size:', len(base_dev_examples), 'base test size:', len(base_test_examples))
+    print('num_labels:', num_labels, 'base training size:', len(base_train_examples))#, 'base dev size:', len(base_dev_examples), 'base test size:', len(base_test_examples))
 
     model = RobertaForSequenceClassification(num_labels)
     tokenizer = RobertaTokenizer.from_pretrained(pretrain_model_dir, do_lower_case=args.do_lower_case)
@@ -610,8 +622,8 @@ def main():
 
 
         base_train_dataloader = examples_to_features(base_train_examples, label_list, class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='random')
-        base_dev_dataloader = examples_to_features(base_dev_examples, label_list, class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='sequential')
-        base_test_dataloader = examples_to_features(base_test_examples, label_list, class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='sequential')
+        # base_dev_dataloader = examples_to_features(base_dev_examples, label_list, class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='sequential')
+        # base_test_dataloader = examples_to_features(base_test_examples, label_list, class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='sequential')
 
 
 
@@ -651,123 +663,11 @@ def main():
                 global_step += 1
                 iter_co+=1
 
-                if iter_co % 1000 == 0:
-                    '''
-                    start evaluate on dev set after this epoch
-                    '''
-                    model.eval()
-                    logger.info("***** Running dev *****")
-                    logger.info("  Num examples = %d", len(base_dev_examples))
-
-
-
-                    for idd, dev_or_test_dataloader in enumerate([base_dev_dataloader, base_test_dataloader]):
-
-
-                        eval_loss = 0
-                        nb_eval_steps = 0
-                        preds = []
-                        gold_label_ids = []
-                        all_hypo_class_ids = []
-                        all_premise_class_ids = []
-                        # print('Evaluating...')
-                        for _, batch in enumerate(tqdm(dev_or_test_dataloader, desc="evaluating")):
-                            input_ids, input_mask, segment_ids, label_ids, test_class_ids, gold_class_ids = batch
-                            # for input_ids, input_mask, segment_ids, label_ids, test_class_ids, gold_class_ids in dev_or_test_dataloader:
-                            input_ids = input_ids.to(device)
-                            input_mask = input_mask.to(device)
-                            segment_ids = segment_ids.to(device)
-                            label_ids = label_ids.to(device)
-                            gold_label_ids+=list(label_ids.detach().cpu().numpy())
-                            all_hypo_class_ids+=list(test_class_ids.detach().cpu().numpy())
-                            all_premise_class_ids+=list(gold_class_ids.detach().cpu().numpy())
-
-
-                            with torch.no_grad():
-                                logits = model(input_ids, input_mask)
-
-                            if len(preds) == 0:
-                                preds.append(logits.detach().cpu().numpy())
-                            else:
-                                preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
-
-                        preds = preds[0]
-
-                        pred_probs = softmax(preds,axis=1)
-                        pos_probs = list(pred_probs[:, 0])
-                        assert len(pos_probs) == len(all_hypo_class_ids)
-                        assert len(pos_probs) == len(all_premise_class_ids)
-                        assert len(pos_probs)%base_truncate_example_size == 0
-                        test_instance_size = len(pos_probs)//base_truncate_example_size
-                        if idd ==0:
-                            assert test_instance_size ==  len(base_dev_examples)//base_truncate_example_size
-                        else:
-                            assert test_instance_size ==  len(base_test_examples)//base_truncate_example_size
-
-                        '''for each test example'''
-                        # for each_test_id in range(test_instance_size):
-
-
-                        hit_ood_co = 0
-                        hit_kd_co = 0
-                        total_ood_co = 0
-                        total_kd_co =0
-                        for each_test_id in range(test_instance_size):
-                            gold_class_set = set(all_premise_class_ids[each_test_id*base_truncate_example_size: (each_test_id+1)*base_truncate_example_size])
-                            assert len(gold_class_set) == 1
-                            gold_class = list(gold_class_set)[0] # can be in the base or ood
-
-                            sub_pos_probs = pos_probs[each_test_id*base_truncate_example_size: (each_test_id+1)*base_truncate_example_size]
-                            sub_hypo_class_ids = all_hypo_class_ids[each_test_id*base_truncate_example_size: (each_test_id+1)*base_truncate_example_size]
-
-                            hypo_class_2_problist = {}
-                            for i in range(base_truncate_example_size):
-                                hypo_class_i = sub_hypo_class_ids[i]
-                                problist = hypo_class_2_problist.get(hypo_class_i)
-                                if problist is None:
-                                    problist = []
-                                problist.append(sub_pos_probs[i])
-                                hypo_class_2_problist[hypo_class_i] = problist
-
-                            '''find the base class with max prob'''
-                            final_pred_class = -1
-                            max_prob = 0.0
-                            for hypo_class_i, problist  in hypo_class_2_problist.items():
-                                mean_prob = np.mean(problist)
-                                if mean_prob > max_prob:
-                                    max_prob = mean_prob
-                                    final_pred_class = hypo_class_i
-
-                            if max_prob < 0.5:
-                                #00d
-                                final_pred_class = class_list.index('ood')
-
-
-                            '''compute acc'''
-                            if gold_class == class_list.index('ood'):
-                                total_ood_co+=1
-                            else:
-                                total_kd_co+=1
-
-                            if final_pred_class == gold_class:
-                                if gold_class == class_list.index('ood'):
-                                    hit_ood_co +=1
-                                else:
-                                    hit_kd_co+=1
-
-                        acc_ood = hit_ood_co/(1e-8+total_ood_co)
-                        acc_kd = hit_kd_co/(1e-8+total_kd_co)
-                        if idd == 0:
-                            if acc_kd > max_dev_acc:
-                                max_dev_acc = acc_kd
-                                print('\n\t dev: acc_kd:', acc_kd, 'max_dev_acc:', max_dev_acc, 'acc_ood:', acc_ood)
-                            else:
-                                print('\n\t dev: acc_kd:', acc_kd, 'max_dev_acc:', max_dev_acc, 'acc_ood:', acc_ood)
-                                break
-                        else:
-                            if acc_kd > max_test_acc:
-                                max_test_acc = acc_kd
-                            print('\n\t test: acc_kd:', acc_kd, 'max_test_acc:',max_test_acc, 'acc_ood:', acc_ood)
+            '''store model after this epoch'''
+            model_to_save = (
+                model.module if hasattr(model, "module") else model
+            )  # Take care of distributed/parallel training
+            store_transformers_models(model_to_save, tokenizer, '/export/home/Dataset/BERT_pretrained_mine/MNLI_pretrained', 'incremental.base.pt')
 
 
 if __name__ == "__main__":
@@ -775,7 +675,7 @@ if __name__ == "__main__":
 
 '''
 
-CUDA_VISIBLE_DEVICES=2 python -u train.kazuma.py --task_name rte --do_train --do_lower_case --num_train_epochs 20 --train_batch_size 32 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 128 --seed 42
+CUDA_VISIBLE_DEVICES=3 python -u train.base.binary.same.class.py --task_name rte --do_train --do_lower_case --num_train_epochs 3 --train_batch_size 16 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 128 --seed 42
 
 
 '''
