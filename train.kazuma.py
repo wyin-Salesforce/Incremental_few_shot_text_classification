@@ -124,7 +124,7 @@ class InputExample(object):
         self.text_a = text_a
         self.text_b = text_b
         self.label = label
-        self.hypo_class = test_class
+        self.hypo_class = hypo_class
         self.premise_class = premise_class
 
 
