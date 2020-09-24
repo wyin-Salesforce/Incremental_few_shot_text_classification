@@ -206,8 +206,6 @@ class RteProcessor(DataProcessor):
                 for ex_j in other_ex_list:
                     examples_neg.append(
                         InputExample(guid='base', text_a=ex_i, text_b=ex_j, label='neg',  hypo_class = class_i, premise_class = class_i))
-                    examples_neg.append(
-                        InputExample(guid='base', text_a=ex_j, text_b=ex_i, label='neg',  hypo_class = class_i, premise_class = class_i))
 
 
         # examples_pos = examples_pos[:200]
@@ -374,8 +372,8 @@ def convert_examples_to_features(examples, label_list, class_list, max_seq_lengt
                               input_mask=input_mask,
                               segment_ids=segment_ids,
                               label_id=label_id,
-                              test_class_id = class_map[example.test_class],
-                              gold_class_id = class_map[example.gold_class]))
+                              test_class_id = class_map[example.hypo_class],
+                              gold_class_id = class_map[example.premise_class]))
     return features
 
 def _truncate_seq_pair(tokens_a, tokens_b, max_length):
