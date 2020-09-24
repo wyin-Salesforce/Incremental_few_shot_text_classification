@@ -227,7 +227,7 @@ class RteProcessor(DataProcessor):
             gold_class = class_2_ood.get(parts[0].strip())
             sent = parts[1].strip()
             '''this sent compares with all base examples'''
-            print('each test example compares with', len(base_class2example_list.keys()), ' base classes')
+            # print('each test example compares with', len(base_class2example_list.keys()), ' base classes')
             for test_class, ex_list in base_class2example_list.items():
                 test_class = class_2_ood.get(test_class)
                 for ex in ex_list:
@@ -567,7 +567,7 @@ def main():
     processor = processors[task_name]()
     output_mode = output_modes[task_name]
     class_list, class_2_ood = load_class_names()
-    print('class_list:', class_list)
+    # print('class_list:', class_list)
     base_train_examples, base_class2example_list = processor.load_Base_train('/export/home/Dataset/incrementalFewShotTextClassification/base_train.txt')
 
 
@@ -719,7 +719,7 @@ def main():
                 for each_test_id in range(test_instance_size):
                     gold_class_set = set(all_premise_class_ids[each_test_id*base_truncate_example_size: (each_test_id+1)*base_truncate_example_size])
                     assert len(gold_class_set) == 1
-                    gold_class = list(gold_class)[0] # can be in the base or ood
+                    gold_class = list(gold_class_set)[0] # can be in the base or ood
 
                     sub_pos_probs = pos_probs[each_test_id*base_truncate_example_size: (each_test_id+1)*base_truncate_example_size]
                     sub_hypo_class_ids = all_hypo_class_ids[each_test_id*base_truncate_example_size: (each_test_id+1)*base_truncate_example_size]
