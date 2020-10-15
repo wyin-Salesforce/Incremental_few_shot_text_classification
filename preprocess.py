@@ -44,10 +44,10 @@ def split_into_three_rounds(class_2_textlist):
     '''first split classes into: base, r1, r2, ood'''
     all_class_list  = list(class_2_textlist.keys())
     random.shuffle(all_class_list)
-    base_class_list = all_class_list[:40] # 40
-    r1_class_list = all_class_list[40:50] # 10
-    r2_class_list = all_class_list[50:60] # 10
-    ood_class_list = all_class_list[60:] # 17
+    base_class_list = all_class_list[:50] # 50
+    r1_class_list = all_class_list[50:60] # 10
+    r2_class_list = all_class_list[60:70] # 10
+    ood_class_list = all_class_list[70:] # 7
 
     '''base to train, dev and test'''
     base_examples_in_train = set()
