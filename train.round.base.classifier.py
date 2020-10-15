@@ -511,6 +511,7 @@ def main():
     nb_tr_steps = 0
     tr_loss = 0
     max_test_acc = 0.0
+    max_test_acc_list = [0,0]
     max_dev_acc = 0.0
     if args.do_train:
         train_features = convert_examples_to_features(
@@ -647,6 +648,7 @@ def main():
 
             best_threshold = -0.1
             best_acc_by_threshold = 0.0
+            best_acc_by_list = [0,0]
             for threshold in np.arange(0.99, 0.0, -0.01):
                 pred_label_ids = []
                 for pred_label, pred_prob in zip(pred_label_ids_raw, pred_max_prob):
@@ -657,19 +659,32 @@ def main():
 
                 gold_label_ids = gold_label_ids
                 assert len(pred_label_ids) == len(gold_label_ids)
-                hit_co = 0
+                hit_co_seen = 0
+                hit_co_unseen = 0
+                all_co_seen = 0
+                all_co_unseen = 0
                 for k in range(len(pred_label_ids)):
+                    if gold_label_ids[k] == len(label_list_with_ood)-1:
+                        all_co_unseen+=1
+                    else:
+                        all_co_seen+=1
                     if pred_label_ids[k] == gold_label_ids[k]:
-                        hit_co +=1
-                test_acc = hit_co/len(gold_label_ids)
+                        if gold_label_ids[k] == len(label_list_with_ood)-1:
+                            hit_co_unseen +=1
+                        else:
+                            hit_co_seen+=1
+                test_seen_acc = hit_co_seen/all_co_seen
+                test_unseen_acc = hit_co_unseen/all_co_unseen
+                test_acc = test_seen_acc + test_unseen_acc
                 if test_acc > best_acc_by_threshold:
                     best_acc_by_threshold = test_acc
                     best_threshold = threshold
+                    best_acc_by_list = [test_seen_acc, test_unseen_acc]
 
             dev_acc = best_acc_by_threshold
             if dev_acc > max_dev_acc:
                 max_dev_acc = dev_acc
-                print('\ndev acc:', dev_acc, 'threshold:', best_threshold,' max_dev_acc:', max_dev_acc, '\n')
+                print('\ndev acc:', best_acc_by_list, 'threshold:', best_threshold,' max_dev_acc:', max_dev_acc, '\n')
 
 
                 logger.info("***** Running test *****")
@@ -709,17 +724,32 @@ def main():
 
                 gold_label_ids = gold_label_ids
                 assert len(pred_label_ids) == len(gold_label_ids)
-                hit_co = 0
+
+                hit_co_seen = 0
+                hit_co_unseen = 0
+                all_co_seen = 0
+                all_co_unseen = 0
                 for k in range(len(pred_label_ids)):
+                    if gold_label_ids[k] == len(label_list_with_ood)-1:
+                        all_co_unseen+=1
+                    else:
+                        all_co_seen+=1
                     if pred_label_ids[k] == gold_label_ids[k]:
-                        hit_co +=1
-                test_acc = hit_co/len(gold_label_ids)
+                        if gold_label_ids[k] == len(label_list_with_ood)-1:
+                            hit_co_unseen +=1
+                        else:
+                            hit_co_seen+=1
+                test_seen_acc = hit_co_seen/all_co_seen
+                test_unseen_acc = hit_co_unseen/all_co_unseen
+                test_acc = test_seen_acc + test_unseen_acc
+
                 if test_acc > max_test_acc:
                     max_test_acc = test_acc
-                print('\n\t\t test_acc:', test_acc, 'max_test_acc', max_test_acc)
+                    max_test_acc_list = [test_seen_acc, test_unseen_acc]
+                print('\n\t\t test_acc:', [test_seen_acc, test_unseen_acc], 'max_test_acc', max_test_acc_list)
 
             else:
-                print('\ndev acc:', dev_acc, ' max_dev_acc:', max_dev_acc, '\n')
+                print('\ndev acc:', best_acc_by_list, 'threshold:', best_threshold,' max_dev_acc:', max_dev_acc, '\n')
 
 
 
