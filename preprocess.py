@@ -17,6 +17,8 @@ def statistics(filename_list, quotechar = None):
             for line in reader:
                 # if sys.version_info[0] == 2:
                 #     l'ine = list(unicode(cell, 'utf-8') for cell in line)
+
+                print('line:', line)
                 class_str = line[0].strip()
                 sent = line[1].strip()
                 if line_co > 0:
