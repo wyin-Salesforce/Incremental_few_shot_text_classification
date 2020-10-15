@@ -107,17 +107,15 @@ def split_into_three_rounds(class_2_textlist):
     ood_examples_in_dev = set()
     ood_examples_in_test = set()
 
-    all_ood_texts = []
     for cl in ood_class_list:
         textlist  = class_2_textlist.get(cl)
-        all_ood_texts+=textlist
-    random.shuffle(all_ood_texts)
-    dev_examples = all_ood_texts[:dev_size_per_class] #20
-    test_examples = all_ood_texts[dev_size_per_class:(dev_size_per_class+test_size_per_class)] # 40
-    for text in dev_examples:
-        ood_examples_in_dev.add(('ood', text))
-    for text in test_examples:
-        ood_examples_in_test.add(('ood', text))
+        random.shuffle(textlist)
+        dev_examples = textlist[:dev_size_per_class] #20
+        test_examples = textlist[dev_size_per_class:(dev_size_per_class+test_size_per_class)] # 40
+        for text in dev_examples:
+            ood_examples_in_dev.add(('ood', text))
+        for text in test_examples:
+            ood_examples_in_test.add(('ood', text))
 
     '''combine them as the final train, dev and test in each round'''
     '''round base'''
