@@ -478,7 +478,7 @@ def main():
     output_mode = output_modes[task_name]
 
     path = '/export/home/Dataset/incrementalFewShotTextClassification/wenpeng/'
-    train_examples, dev_examples, test_examples, label_list = processor.get_Banking77('round.base.train.txt', 'round.base.dev.txt', 'round.base.test.txt')
+    train_examples, dev_examples, test_examples, label_list = processor.get_Banking77(path+'round.base.train.txt', path+'round.base.dev.txt', path+'round.base.test.txt')
     label_list_with_ood = label_list+['ood']
     num_labels = len(label_list)
     print('num_labels:', num_labels, 'training size:', len(train_examples), 'dev size:', len(dev_examples), 'test size:', len(test_examples))
