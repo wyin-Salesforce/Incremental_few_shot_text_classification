@@ -740,7 +740,7 @@ if __name__ == "__main__":
 
 '''
 
-CUDA_VISIBLE_DEVICES=7 python -u train.round.base.classifier.py --task_name rte --do_train --do_lower_case --num_train_epochs 10 --train_batch_size 16 --eval_batch_size 64 --learning_rate 1e-5 --max_seq_length 128 --seed 42
+CUDA_VISIBLE_DEVICES=6 python -u train.round.base.classifier.py --task_name rte --do_train --do_lower_case --num_train_epochs 10 --train_batch_size 16 --eval_batch_size 64 --learning_rate 1e-5 --max_seq_length 128 --seed 42
 
 
 '''
