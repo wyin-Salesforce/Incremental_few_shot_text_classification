@@ -668,9 +668,9 @@ def main():
 
                 gold_label_ids = gold_label_ids
                 assert len(pred_label_ids) == len(gold_label_ids)
-                test_seen_acc = acc_given_gold_labellist(pred_label_ids, gold_label_ids, label_list)
-                test_unseen_acc  = acc_given_gold_labellist(pred_label_ids, gold_label_ids, ['ood'])
-                test_acc = acc_given_gold_labellist(pred_label_ids, gold_label_ids, label_list_with_ood)
+                test_seen_acc = acc_given_gold_labellist(pred_label_ids, gold_label_ids, list(range(num_labels)))
+                test_unseen_acc  = acc_given_gold_labellist(pred_label_ids, gold_label_ids, [num_labels])
+                test_acc = acc_given_gold_labellist(pred_label_ids, gold_label_ids, list(range(num_labels+1)))
                 if test_acc > best_acc_by_threshold:
                     best_acc_by_threshold = test_acc
                     best_threshold = threshold
@@ -720,9 +720,9 @@ def main():
                 gold_label_ids = gold_label_ids
                 assert len(pred_label_ids) == len(gold_label_ids)
 
-                test_seen_acc = acc_given_gold_labellist(pred_label_ids, gold_label_ids, label_list)
-                test_unseen_acc  = acc_given_gold_labellist(pred_label_ids, gold_label_ids, ['ood'])
-                test_acc = acc_given_gold_labellist(pred_label_ids, gold_label_ids, label_list_with_ood)
+                test_seen_acc = acc_given_gold_labellist(pred_label_ids, gold_label_ids, list(range(num_labels)))
+                test_unseen_acc  = acc_given_gold_labellist(pred_label_ids, gold_label_ids, [num_labels])
+                test_acc = acc_given_gold_labellist(pred_label_ids, gold_label_ids, list(range(num_labels+1)))
 
                 if test_acc > max_test_acc:
                     max_test_acc = test_acc
@@ -740,7 +740,7 @@ if __name__ == "__main__":
 
 '''
 
-CUDA_VISIBLE_DEVICES=6 python -u train.round.base.classifier.py --task_name rte --do_train --do_lower_case --num_train_epochs 20 --train_batch_size 16 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 128 --seed 42
+CUDA_VISIBLE_DEVICES=7 python -u train.round.base.classifier.py --task_name rte --do_train --do_lower_case --num_train_epochs 20 --train_batch_size 16 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 128 --seed 42
 
 
 '''
