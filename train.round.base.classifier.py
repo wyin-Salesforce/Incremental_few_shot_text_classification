@@ -545,6 +545,28 @@ def main():
         dev_sampler = SequentialSampler(dev_data)
         dev_dataloader = DataLoader(dev_data, sampler=dev_sampler, batch_size=args.eval_batch_size)
 
+        '''load test set'''
+        test_features = convert_examples_to_features(
+            test_examples, label_list_with_ood, args.max_seq_length, tokenizer, output_mode,
+            cls_token_at_end=False,#bool(args.model_type in ['xlnet']),            # xlnet has a cls token at the end
+            cls_token=tokenizer.cls_token,
+            cls_token_segment_id=0,#2 if args.model_type in ['xlnet'] else 0,
+            sep_token=tokenizer.sep_token,
+            sep_token_extra=True,#bool(args.model_type in ['roberta']),           # roberta uses an extra separator b/w pairs of sentences, cf. github.com/pytorch/fairseq/commit/1684e166e3da03f5b600dbb7855cb98ddfcd0805
+            pad_on_left=False,#bool(args.model_type in ['xlnet']),                 # pad on the left for xlnet
+            pad_token=tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0],
+            pad_token_segment_id=0)#4 if args.model_type in ['xlnet'] else 0,)
+
+        test_all_input_ids = torch.tensor([f.input_ids for f in test_features], dtype=torch.long)
+        test_all_input_mask = torch.tensor([f.input_mask for f in test_features], dtype=torch.long)
+        test_all_segment_ids = torch.tensor([f.segment_ids for f in test_features], dtype=torch.long)
+        test_all_label_ids = torch.tensor([f.label_id for f in test_features], dtype=torch.long)
+
+        test_data = TensorDataset(test_all_input_ids, test_all_input_mask, test_all_segment_ids, test_all_label_ids)
+        test_sampler = SequentialSampler(test_data)
+        test_dataloader = DataLoader(test_data, sampler=test_sampler, batch_size=args.eval_batch_size)
+
+
         logger.info("***** Running training *****")
         logger.info("  Num examples = %d", len(train_examples))
         logger.info("  Batch size = %d", args.train_batch_size)
@@ -648,6 +670,54 @@ def main():
             if dev_acc > max_dev_acc:
                 max_dev_acc = dev_acc
                 print('\ndev acc:', dev_acc, 'threshold:', best_threshold,' max_dev_acc:', max_dev_acc, '\n')
+
+
+                logger.info("***** Running test *****")
+                logger.info("  Num examples = %d", len(test_examples))
+
+                eval_loss = 0
+                nb_eval_steps = 0
+                preds = []
+                gold_label_ids = []
+                # print('Evaluating...')
+                for input_ids, input_mask, segment_ids, label_ids in test_dataloader:
+                    input_ids = input_ids.to(device)
+                    input_mask = input_mask.to(device)
+                    segment_ids = segment_ids.to(device)
+                    label_ids = label_ids.to(device)
+                    gold_label_ids+=list(label_ids.detach().cpu().numpy())
+
+                    with torch.no_grad():
+                        logits = model(input_ids, input_mask)
+                    if len(preds) == 0:
+                        preds.append(logits.detach().cpu().numpy())
+                    else:
+                        preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
+
+                preds = preds[0]
+
+                pred_probs = softmax(preds,axis=1)
+                pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
+                pred_max_prob = list(np.amax(pred_probs, axis=1))
+
+                pred_label_ids = []
+                for pred_label, pred_prob in zip(pred_label_ids_raw, pred_max_prob):
+                    if pred_prob < best_threshold:
+                        pred_label_ids.append(len(label_list_with_ood)-1)
+                    else:
+                        pred_label_ids.append(pred_label)
+
+                gold_label_ids = gold_label_ids
+                assert len(pred_label_ids) == len(gold_label_ids)
+                hit_co = 0
+                for k in range(len(pred_label_ids)):
+                    if pred_label_ids[k] == gold_label_ids[k]:
+                        hit_co +=1
+                test_acc = hit_co/len(gold_label_ids)
+                if test_acc > max_test_acc:
+                    max_test_acc = test_acc
+                print('\n\t\t test_acc:', test_acc, 'max_test_acc', max_test_acc)
+
             else:
                 print('\ndev acc:', dev_acc, ' max_dev_acc:', max_dev_acc, '\n')
 
@@ -659,7 +729,7 @@ if __name__ == "__main__":
 
 '''
 
-CUDA_VISIBLE_DEVICES=6 python -u train.round.base.classifier.py --task_name rte --do_train --do_lower_case --num_train_epochs 20 --train_batch_size 32 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 128 --seed 42
+CUDA_VISIBLE_DEVICES=6 python -u train.round.base.classifier.py --task_name rte --do_train --do_lower_case --num_train_epochs 20 --train_batch_size 16 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 128 --seed 42
 
 
 '''
