@@ -1,16 +1,18 @@
 import codecs
 import csv
 import json
+
+path = '/export/home/Dataset/incrementalFewShotTextClassification/wenpeng/'
 def statistics(filename_list, quotechar = None):
     '''first load all classes'''
-    readfile = codecs.open('/export/home/Dataset/incrementalFewShotTextClassification/wenpeng/categories.json', 'r', 'utf-8')
+    readfile = codecs.open(path+'categories.json', 'r', 'utf-8')
     class_list = json.load(readfile)
 
     '''load train file'''
     class_2_textlist = {}
     for filename in filename_list:
         line_co = 0
-        with open(filename, "r") as f:
+        with open(path+filename, "r") as f:
             reader = csv.reader(f, delimiter=",", quotechar=quotechar)
             for line in reader:
                 # if sys.version_info[0] == 2:
@@ -34,4 +36,4 @@ def statistics(filename_list, quotechar = None):
 
 
 if __name__ == "__main__":
-    statistics('/export/home/Dataset/incrementalFewShotTextClassification/wenpeng/train.csv')
+    statistics(['train.csv', 'test.csv'])
