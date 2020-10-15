@@ -13,14 +13,14 @@ def statistics(filename_list, quotechar = None):
     for filename in filename_list:
         line_co = 0
         with open(path+filename, "r") as f:
-            reader = csv.reader(f, delimiter=",", quotechar=quotechar)
+            reader = csv.DictReader(f)
             for line in reader:
                 # if sys.version_info[0] == 2:
                 #     l'ine = list(unicode(cell, 'utf-8') for cell in line)
 
-                print('line:', line)
-                class_str = line[0].strip()
-                sent = line[1].strip()
+                # if len(line)
+                class_str = line['category']
+                sent = line['text']
                 if line_co > 0:
                     textlist = class_2_textlist.get(class_str)
                     if textlist is None:
