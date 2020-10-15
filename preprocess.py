@@ -2,7 +2,7 @@
 import csv
 def statistics(input_file, quotechar = None):
     with open(input_file, "r") as f:
-        reader = csv.reader(f, delimiter="\t", quotechar=quotechar)
+        reader = csv.reader(f, delimiter=",", quotechar=quotechar)
         lines = []
         for line in reader:
             # if sys.version_info[0] == 2:
