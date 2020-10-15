@@ -161,7 +161,7 @@ class RteProcessor(DataProcessor):
         '''
         classes: ["entailment", "neutral", "contradiction"]
         '''
-        class_set = set()
+        class_set = []
         examples_per_file = []
 
         for filename in [train_filename, dev_filename, test_filename]:
@@ -176,7 +176,7 @@ class RteProcessor(DataProcessor):
                     text_a = line[1].strip()
                     label = line[0].strip()
                     if label !='ood':
-                        class_set.add(label)
+                        class_set.append(label)
                     examples.append(
                         InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
                     line_co+=1
