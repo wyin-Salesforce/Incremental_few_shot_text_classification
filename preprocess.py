@@ -6,6 +6,9 @@ import random
 random.seed(42)
 # np.random.seed(args.seed)
 
+dev_size_per_class = 20
+test_size_per_class = 40
+
 path = '/export/home/Dataset/incrementalFewShotTextClassification/wenpeng/'
 def load_raw_examples(filename_list, quotechar = None):
     '''first load all classes'''
@@ -54,9 +57,9 @@ def split_into_three_rounds(class_2_textlist):
     for cl in base_class_list:
         textlist  = class_2_textlist.get(cl)
         random.shuffle(textlist)
-        train_examples = textlist[:-60]
-        dev_examples = textlist[-60:-40] #20
-        test_examples = textlist[-40:] # 40
+        train_examples = textlist[:-(dev_size_per_class+test_size_per_class)]
+        dev_examples = textlist[-(dev_size_per_class+test_size_per_class):-test_size_per_class] #20
+        test_examples = textlist[-test_size_per_class:] # 40
         for text in train_examples:
             base_examples_in_train.add((cl, text))
         for text in dev_examples:
@@ -73,8 +76,8 @@ def split_into_three_rounds(class_2_textlist):
         random.shuffle(textlist)
         k_shot = random.randrange(1,6)
         k_shot_examples = textlist[:k_shot] #k_shot
-        dev_examples = textlist[k_shot:k_shot+20] #20
-        test_examples = textlist[k_shot+20:k_shot+60] # 40
+        dev_examples = textlist[k_shot:k_shot+dev_size_per_class] #20
+        test_examples = textlist[k_shot+dev_size_per_class:k_shot+(dev_size_per_class+test_size_per_class)] # 40
         for text in k_shot_examples:
             r1_examples_in_train.add((cl, text))
         for text in dev_examples:
@@ -92,8 +95,8 @@ def split_into_three_rounds(class_2_textlist):
         random.shuffle(textlist)
         k_shot = random.randrange(1,6)
         k_shot_examples = textlist[:k_shot] #k_shot
-        dev_examples = textlist[k_shot:k_shot+20] #20
-        test_examples = textlist[k_shot+20:k_shot+60] # 40
+        dev_examples = textlist[k_shot:k_shot+dev_size_per_class] #20
+        test_examples = textlist[k_shot+dev_size_per_class:k_shot+(dev_size_per_class+test_size_per_class)] # 40
         for text in k_shot_examples:
             r2_examples_in_train.add((cl, text))
         for text in dev_examples:
@@ -109,8 +112,8 @@ def split_into_three_rounds(class_2_textlist):
         textlist  = class_2_textlist.get(cl)
         all_ood_texts+=textlist
     random.shuffle(all_ood_texts)
-    dev_examples = all_ood_texts[:20] #20
-    test_examples = all_ood_texts[20:60] # 40
+    dev_examples = all_ood_texts[:dev_size_per_class] #20
+    test_examples = all_ood_texts[dev_size_per_class:(dev_size_per_class+test_size_per_class)] # 40
     for text in dev_examples:
         ood_examples_in_dev.add(('ood', text))
     for text in test_examples:
