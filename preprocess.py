@@ -51,16 +51,15 @@ def split_into_three_rounds(class_2_textlist):
     for cl in base_class_list:
         textlist  = class_2_textlist.get(cl)
         random.shuffle(textlist)
-        ex_size = len(textlist)
-        train_ex_size = int(ex_size*0.5)
-        dev_ex_size = int(ex_size*0.7)
-        for id, text in enumerate(textlist):
-            if id < train_ex_size:
-                base_examples_in_train.add((cl, text))
-            elif id < dev_ex_size:
-                base_examples_in_dev.add((cl, text))
-            else:
-                base_examples_in_test.add((cl, text))
+        train_examples = textlist[:-60]
+        dev_examples = textlist[-60:-40] #20
+        test_examples = textlist[-40:] # 40
+        for text in train_examples:
+            base_examples_in_train.add((cl, text))
+        for text in dev_examples:
+            base_examples_in_dev.add((cl, text))
+        for text in test_examples:
+            base_examples_in_test.add((cl, text))
     '''r1 to train, dev and test'''
     r1_examples_in_train = set()
     r1_examples_in_dev = set()
@@ -101,15 +100,18 @@ def split_into_three_rounds(class_2_textlist):
     '''ood to dev and test'''
     ood_examples_in_dev = set()
     ood_examples_in_test = set()
+
+    all_ood_texts = []
     for cl in ood_class_list:
         textlist  = class_2_textlist.get(cl)
-        random.shuffle(textlist)
-        dev_examples = textlist[:20] #20
-        test_examples = textlist[20:60] # 40
-        for text in dev_examples:
-            ood_examples_in_dev.add(('ood', text))
-        for text in test_examples:
-            ood_examples_in_test.add(('ood', text))
+        all_ood_texts+=textlist
+    random.shuffle(all_ood_texts)
+    dev_examples = all_ood_texts[:20] #20
+    test_examples = all_ood_texts[20:60] # 40
+    for text in dev_examples:
+        ood_examples_in_dev.add(('ood', text))
+    for text in test_examples:
+        ood_examples_in_test.add(('ood', text))
 
     '''combine them as the final train, dev and test in each round'''
     '''round base'''
