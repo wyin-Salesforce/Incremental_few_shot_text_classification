@@ -3,6 +3,9 @@ import csv
 import json
 import random
 
+random.seed(42)
+# np.random.seed(args.seed)
+
 path = '/export/home/Dataset/incrementalFewShotTextClassification/wenpeng/'
 def load_raw_examples(filename_list, quotechar = None):
     '''first load all classes'''
