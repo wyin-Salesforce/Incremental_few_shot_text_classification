@@ -161,7 +161,7 @@ class RteProcessor(DataProcessor):
         '''
         classes: ["entailment", "neutral", "contradiction"]
         '''
-        class_set = []
+        class_set = set()
         examples_per_file = []
 
         for filename in [train_filename, dev_filename, test_filename]:
@@ -176,7 +176,7 @@ class RteProcessor(DataProcessor):
                     text_a = line[1].strip()
                     label = line[0].strip()
                     if label !='ood':
-                        class_set.append(label)
+                        class_set.add(label)
                     examples.append(
                         InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
                     line_co+=1
@@ -185,7 +185,7 @@ class RteProcessor(DataProcessor):
             readfile.close()
             print('loaded  BANKING77 size:', len(examples), 'wrong_lines:', wrong_lines)
             examples_per_file.append(examples)
-        return examples_per_file[0], examples_per_file[1], examples_per_file[2], class_set #train, dev
+        return examples_per_file[0], examples_per_file[1], examples_per_file[2], list(class_set) #train, dev
 
     def get_labels(self):
         'here we keep the three-way in MNLI training '
