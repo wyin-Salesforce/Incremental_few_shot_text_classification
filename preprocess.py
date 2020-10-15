@@ -32,6 +32,7 @@ def statistics(filename_list, quotechar = None):
         text_size = 0
         for key, value in class_2_textlist.items():
             text_size+=len(value)
+            assert key is in set(class_list)
         print('class_2_textlist size:', len(class_2_textlist), ' sent size:', text_size)
 
 
