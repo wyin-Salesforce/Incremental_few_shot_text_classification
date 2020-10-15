@@ -351,7 +351,16 @@ def _truncate_seq_pair(tokens_a, tokens_b, max_length):
 
 
 
+def acc_given_gold_labellist(pred_labellist, gold_labellist, labellist):
 
+    total_size = 0
+    hit_size = 0
+    for pred_label, gold_label in zip(pred_labellist, gold_labellist):
+        if gold_label in set(labellist):
+            total_size+=1
+            if gold_label == pred_label:
+                hit_size+=1
+    return hit_size/total_size
 
 
 
@@ -659,23 +668,9 @@ def main():
 
                 gold_label_ids = gold_label_ids
                 assert len(pred_label_ids) == len(gold_label_ids)
-                hit_co_seen = 0
-                hit_co_unseen = 0
-                all_co_seen = 0
-                all_co_unseen = 0
-                for k in range(len(pred_label_ids)):
-                    if gold_label_ids[k] == len(label_list_with_ood)-1:
-                        all_co_unseen+=1
-                    else:
-                        all_co_seen+=1
-                    if pred_label_ids[k] == gold_label_ids[k]:
-                        if gold_label_ids[k] == len(label_list_with_ood)-1:
-                            hit_co_unseen +=1
-                        else:
-                            hit_co_seen+=1
-                test_seen_acc = hit_co_seen/all_co_seen
-                test_unseen_acc = hit_co_unseen/all_co_unseen
-                test_acc = test_seen_acc + test_unseen_acc
+                test_seen_acc = acc_given_gold_labellist(pred_label_ids, gold_label_ids, label_list)
+                test_unseen_acc  = acc_given_gold_labellist(pred_label_ids, gold_label_ids, ['ood'])
+                test_acc = acc_given_gold_labellist(pred_label_ids, gold_label_ids, label_list_with_ood)
                 if test_acc > best_acc_by_threshold:
                     best_acc_by_threshold = test_acc
                     best_threshold = threshold
@@ -725,33 +720,19 @@ def main():
                 gold_label_ids = gold_label_ids
                 assert len(pred_label_ids) == len(gold_label_ids)
 
-                hit_co_seen = 0
-                hit_co_unseen = 0
-                all_co_seen = 0
-                all_co_unseen = 0
-                for k in range(len(pred_label_ids)):
-                    if gold_label_ids[k] == len(label_list_with_ood)-1:
-                        all_co_unseen+=1
-                    else:
-                        all_co_seen+=1
-                    if pred_label_ids[k] == gold_label_ids[k]:
-                        if gold_label_ids[k] == len(label_list_with_ood)-1:
-                            hit_co_unseen +=1
-                        else:
-                            hit_co_seen+=1
-                test_seen_acc = hit_co_seen/all_co_seen
-                test_unseen_acc = hit_co_unseen/all_co_unseen
-                test_acc = test_seen_acc + test_unseen_acc
+                test_seen_acc = acc_given_gold_labellist(pred_label_ids, gold_label_ids, label_list)
+                test_unseen_acc  = acc_given_gold_labellist(pred_label_ids, gold_label_ids, ['ood'])
+                test_acc = acc_given_gold_labellist(pred_label_ids, gold_label_ids, label_list_with_ood)
 
                 if test_acc > max_test_acc:
                     max_test_acc = test_acc
                     max_test_acc_list = [test_seen_acc, test_unseen_acc]
                 print('\n\t\t test_acc:', [test_seen_acc, test_unseen_acc], 'max_test_acc', max_test_acc_list)
-
+                final_test_performance = [test_seen_acc, test_unseen_acc]
             else:
                 print('\ndev acc:', best_acc_by_list, 'threshold:', best_threshold,' max_dev_acc:', max_dev_acc, '\n')
 
-
+        print('final_test_performance:', final_test_performance)
 
 
 if __name__ == "__main__":
