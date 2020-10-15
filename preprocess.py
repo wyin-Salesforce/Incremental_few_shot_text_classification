@@ -1,4 +1,4 @@
-
+import codecs
 import csv
 import json
 def statistics(input_file, quotechar = None):
