@@ -1,13 +1,13 @@
 import codecs
 import csv
 import json
-def statistics(input_file, quotechar = None):
+def statistics(train_file, quotechar = None):
     '''first load all classes'''
     readfile = codecs.open('/export/home/Dataset/incrementalFewShotTextClassification/wenpeng/categories.json', 'r', 'utf-8')
-    data = json.load(readfile)
-    print('data:', len(data), data)
-    exit(0)
-    with open(input_file, "r") as f:
+    class_list = json.load(readfile)
+
+    '''load train file'''
+    with open(train_file, "r") as f:
         reader = csv.reader(f, delimiter=",", quotechar=quotechar)
         lines = []
         for line in reader:
