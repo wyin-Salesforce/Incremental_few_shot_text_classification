@@ -1,6 +1,12 @@
 
 import csv
+import json
 def statistics(input_file, quotechar = None):
+    '''first load all classes'''
+    readfile = codecs.open('/export/home/Dataset/incrementalFewShotTextClassification/wenpeng/categories.json', 'r', 'utf-8')
+    data = json.load(readfile)
+    print('data:', len(data), data)
+    exit(0)
     with open(input_file, "r") as f:
         reader = csv.reader(f, delimiter=",", quotechar=quotechar)
         lines = []
