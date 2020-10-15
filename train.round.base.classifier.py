@@ -163,22 +163,27 @@ class RteProcessor(DataProcessor):
         '''
         class_set = set()
         examples_per_file = []
+
         for filename in [train_filename, dev_filename, test_filename]:
             examples=[]
+            wrong_lines = 0
             readfile = codecs.open(filename, 'r', 'utf-8')
             line_co=0
             for row in readfile:
                 line=row.strip().split('\t')
-                guid = "train-"+str(line_co)
-                text_a = line[1].strip()
-                label = line[0].strip()
-                if label !='ood':
-                    class_set.add(label)
-                examples.append(
-                    InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
-                line_co+=1
+                if len(line) ==2:
+                    guid = "train-"+str(line_co)
+                    text_a = line[1].strip()
+                    label = line[0].strip()
+                    if label !='ood':
+                        class_set.add(label)
+                    examples.append(
+                        InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
+                    line_co+=1
+                else:
+                    wrong_lines+=1
             readfile.close()
-            print('loaded  BANKING77 size:', len(examples))
+            print('loaded  BANKING77 size:', len(examples), 'wrong_lines:', wrong_lines)
             examples_per_file.append(examples)
         return examples_per_file[0], examples_per_file[1], examples_per_file[2], class_set #train, dev
 
