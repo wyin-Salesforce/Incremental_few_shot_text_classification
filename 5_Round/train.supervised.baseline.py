@@ -689,22 +689,46 @@ def main():
                         pred_label_ids.append(pred_label_ids_raw[i])
 
                 assert len(pred_label_ids) == len(gold_label_ids)
-                test_seen_size = 0
-                test_seen_hit = 0
-                test_unseen_size = 0
-                test_unseen_hit = 0
-                for i, label_i in enumerate(gold_label_ids):
-                    if label_i == -1:
-                        test_unseen_size+=1
-                        if label_i == pred_label_ids[i]:
-                            test_unseen_hit+=1
+                acc_each_round = []
+                for round_name_id in round_list:
+                    #base, n1, n2, ood
+                    round_size = 0
+                    rount_hit = 0
+                    if round_name_id != 'ood':
+                        for ii, gold_label_id in enumerate(gold_label_ids):
+                            if test_split_list[gold_label_id] == round_name_id:
+                                round_size+=1
+                                if gold_label_id == pred_label_ids[ii]:
+                                    rount_hit+=1
+                        acc_i = rount_hit/round_size
+                        acc_each_round.append(acc_i)
                     else:
-                        test_seen_size+=1
-                        if label_i == pred_label_ids[i]:
-                            test_seen_hit+=1
-                test_seen_acc = test_seen_hit/test_seen_size
-                test_unseen_acc  = test_unseen_hit/test_unseen_size
-                test_acc = (test_seen_acc+test_unseen_acc)*0.5 #acc_given_gold_labellist(pred_label_ids, gold_label_ids, list(range(num_labels+1)))
+                        '''ood acc'''
+                        for ii, gold_label_id in enumerate(gold_label_ids):
+                            if test_split_list[gold_label_id] == round_name_id:
+                                round_size+=1
+                                if pred_label_ids[ii]==-1:
+                                    rount_hit+=1
+                        acc_i = rount_hit/round_size
+                        acc_each_round.append(acc_i)
+
+                # test_seen_size = 0
+                # test_seen_hit = 0
+                # test_unseen_size = 0
+                # test_unseen_hit = 0
+                # for i, label_i in enumerate(gold_label_ids):
+                #     if label_i == -1:
+                #         test_unseen_size+=1
+                #         if label_i == pred_label_ids[i]:
+                #             test_unseen_hit+=1
+                #     else:
+                #         test_seen_size+=1
+                #         if label_i == pred_label_ids[i]:
+                #             test_seen_hit+=1
+                # test_seen_acc = test_seen_hit/test_seen_size
+                # test_unseen_acc  = test_unseen_hit/test_unseen_size
+                # test_acc = (test_seen_acc+test_unseen_acc)*0.5 #acc_given_gold_labellist(pred_label_ids, gold_label_ids, list(range(num_labels+1)))
+                test_acc = np.mean(acc_each_round)
                 if test_acc > best_acc_by_threshold:
                     best_acc_by_threshold = test_acc
                     best_threshold = threshold
@@ -789,7 +813,7 @@ if __name__ == "__main__":
 
 '''
 
-CUDA_VISIBLE_DEVICES=3 python -u train.supervised.baseline.py --task_name rte --do_train --do_lower_case --num_train_epochs 3 --train_batch_size 20 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 128 --seed 42 --round_name 'r1'
+CUDA_VISIBLE_DEVICES=3 python -u train.supervised.baseline.py --task_name rte --do_train --do_lower_case --num_train_epochs 20 --train_batch_size 20 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 128 --seed 42 --round_name 'r1'
 
 
 '''
