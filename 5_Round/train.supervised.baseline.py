@@ -37,7 +37,7 @@ from torch.nn import CrossEntropyLoss, MSELoss
 from scipy.special import softmax
 # from scipy.stats import pearsonr, spearmanr
 # from sklearn.metrics import matthews_corrcoef, f1_score
-from sklearn.metrics import f1_score
+
 from transformers.tokenization_roberta import RobertaTokenizer
 from transformers.optimization import AdamW
 from transformers.modeling_roberta import RobertaModel#RobertaForSequenceClassification
@@ -73,6 +73,7 @@ class RobertaForSequenceClassification(nn.Module):
         self.tagset_size = tagset_size
 
         self.roberta_single= RobertaModel.from_pretrained(pretrain_model_dir)
+        self.roberta_single.load_state_dict(torch.load('/export/home/Dataset/BERT_pretrained_mine/MNLI_pretrained/_acc_0.9040886899918633.pt'), strict=False)
         self.single_hidden2tag = RobertaClassificationHead(bert_hidden_dim, tagset_size)
 
     def forward(self, input_ids, input_mask):
@@ -157,35 +158,50 @@ class DataProcessor(object):
 class RteProcessor(DataProcessor):
     """Processor for the RTE data set (GLUE version)."""
 
-    def get_Banking77(self, train_filename, dev_filename, test_filename):
-        '''
-        classes: ["entailment", "neutral", "contradiction"]
-        '''
-        class_set = set()
-        examples_per_file = []
-
-        for filename in [train_filename, dev_filename, test_filename]:
-            examples=[]
-            wrong_lines = 0
+    def load_train(self, round_list):
+        find_class_list = []
+        examples = []
+        for round in round_list:
+            filename = '/export/home/Dataset/incrementalFewShotTextClassification/Incremental-few-shot-text-classification-master/dataset/banking77/split/'+'train.txt'
             readfile = codecs.open(filename, 'r', 'utf-8')
-            line_co=0
             for row in readfile:
-                line=row.strip().split('\t')
-                if len(line) ==2:
-                    guid = "train-"+str(line_co)
-                    text_a = line[1].strip()
-                    label = line[0].strip()
-                    if label !='ood':
-                        class_set.add(label)
-                    examples.append(
-                        InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
-                    line_co+=1
-                else:
-                    wrong_lines+=1
+                parts = row.strip().split('\t')
+                assert len(parts)==2
+                class_name = parts[0].strip()
+                if class_name not in set(find_class_list):
+                    find_class_list.append(class_name)
+                example_str = parts[1].strip()
+                examples.append(
+                    InputExample(guid='train', text_a=example_str, text_b=None, label=class_name))
             readfile.close()
-            print('loaded  BANKING77 size:', len(examples), 'wrong_lines:', wrong_lines)
-            examples_per_file.append(examples)
-        return examples_per_file[0], examples_per_file[1], examples_per_file[2], list(class_set) #train, dev
+        return examples, find_class_list
+
+
+
+
+
+    def load_dev_or_test(self, round_list, find_class_list, flag):
+        '''
+        find_class_list: classes in training, i.e., seen classes
+        '''
+        # find_class_list = []
+        examples = []
+        for round in round_list:
+            filename = '/export/home/Dataset/incrementalFewShotTextClassification/Incremental-few-shot-text-classification-master/dataset/banking77/split/'+flag+'.txt'
+            readfile = codecs.open(filename, 'r', 'utf-8')
+            for row in readfile:
+                parts = row.strip().split('\t')
+                assert len(parts)==2
+                class_name = parts[0].strip()
+                if class_name not in set(find_class_list):
+                    find_class_list.append(class_name)
+                example_str = parts[1].strip()
+                examples.append(
+                    InputExample(guid='eval', text_a=example_str, text_b=None, label=class_name))
+            readfile.close()
+        return examples, find_class_list
+
+
 
     def get_labels(self):
         'here we keep the three-way in MNLI training '
@@ -314,21 +330,12 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
         else:
             raise KeyError(output_mode)
 
-        # if ex_index < 5:
-        #     logger.info("*** Example ***")
-        #     logger.info("guid: %s" % (example.guid))
-        #     logger.info("tokens: %s" % " ".join(
-        #             [str(x) for x in tokens]))
-        #     logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-        #     logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-        #     logger.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-        #     logger.info("label: %s (id = %d)" % (example.label, label_id))
 
         features.append(
                 InputFeatures(input_ids=input_ids,
                               input_mask=input_mask,
                               segment_ids=segment_ids,
-                              label_id=label_id))
+                              label_id=label_id)
     return features
 
 def _truncate_seq_pair(tokens_a, tokens_b, max_length):
@@ -350,22 +357,62 @@ def _truncate_seq_pair(tokens_a, tokens_b, max_length):
 
 
 
+def load_class_names():
+    readfile = codecs.open('/export/home/Dataset/incrementalFewShotTextClassification/Incremental-few-shot-text-classification-master/dataset/banking77/split/category_split.txt', 'r', 'utf-8')
+    class_list = set()
+    ood_classes = set()
+    class_2_split = {}
+    for line in readfile:
+        parts = line.strip().split('\t')
+        class_str = parts[1].strip()
+        split_str = parts[0].strip()
+        class_2_split[class_str] = split_str # base, n1, ...n5, ood
+        class_list.add(class_str)
+        if split_str == 'ood':
+            ood_classes.add(class_str)
+    print('class_list size:', len(class_list), ' it has ood class size:', len(ood_classes))
+    return list(class_list), ood_classes, class_2_split
 
-def acc_given_gold_labellist(pred_labellist, gold_labellist, labellist):
 
-    total_size = 0
-    hit_size = 0
-    for pred_label, gold_label in zip(pred_labellist, gold_labellist):
-        if gold_label in set(labellist):
-            total_size+=1
-            if gold_label == pred_label:
-                hit_size+=1
-    return hit_size/total_size
+def examples_to_features(source_examples, label_list, args, tokenizer, batch_size, output_mode, dataloader_mode='sequential'):
+    source_features = convert_examples_to_features(
+        source_examples, label_list, args.max_seq_length, tokenizer, output_mode,
+        cls_token_at_end=False,#bool(args.model_type in ['xlnet']),            # xlnet has a cls token at the end
+        cls_token=tokenizer.cls_token,
+        cls_token_segment_id=0,#2 if args.model_type in ['xlnet'] else 0,
+        sep_token=tokenizer.sep_token,
+        sep_token_extra=True,#bool(args.model_type in ['roberta']),           # roberta uses an extra separator b/w pairs of sentences, cf. github.com/pytorch/fairseq/commit/1684e166e3da03f5b600dbb7855cb98ddfcd0805
+        pad_on_left=False,#bool(args.model_type in ['xlnet']),                 # pad on the left for xlnet
+        pad_token=tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0],
+        pad_token_segment_id=0)#4 if args.model_type in ['xlnet'] else 0,)
 
-# def f1_given_gold_labellist(pred_labellist, gold_labellist, labellist):
-#
-#     f1_list = f1_score(y_true, y_pred, labels = labellist, average=None)
-#     return f1_list
+    dev_all_input_ids = torch.tensor([f.input_ids for f in source_features], dtype=torch.long)
+    dev_all_input_mask = torch.tensor([f.input_mask for f in source_features], dtype=torch.long)
+    dev_all_segment_ids = torch.tensor([f.segment_ids for f in source_features], dtype=torch.long)
+    dev_all_label_ids = torch.tensor([f.label_id for f in source_features], dtype=torch.long)
+
+    dev_data = TensorDataset(dev_all_input_ids, dev_all_input_mask, dev_all_segment_ids, dev_all_label_ids)
+    if dataloader_mode=='sequential':
+        dev_sampler = SequentialSampler(dev_data)
+    else:
+        dev_sampler = RandomSampler(dev_data)
+    dev_dataloader = DataLoader(dev_data, sampler=dev_sampler, batch_size=batch_size)
+
+
+    return dev_dataloader
+
+def store_transformers_models(model, tokenizer, output_dir, flag_str):
+    '''
+    store the model
+    '''
+    output_dir+='/'+flag_str
+    # if not os.path.exists(output_dir):
+    #     os.makedirs(output_dir)
+    print('starting model storing....')
+    # model.save_pretrained(output_dir)
+    torch.save(model.state_dict(), output_dir)
+    # tokenizer.save_pretrained(output_dir)
+    print('store succeed')
 
 def main():
     parser = argparse.ArgumentParser()
@@ -488,22 +535,40 @@ def main():
     if task_name not in processors:
         raise ValueError("Task not found: %s" % (task_name))
 
-
+    round_name_2_rounds={'base':['base', 'ood'],
+                         'r1':['base', 'n1', 'ood'],
+                         'r2':['base', 'n1', 'n2', 'ood'],
+                         'r3':['base', 'n1', 'n2', 'n3', 'ood'],
+                         'r4':['base', 'n1', 'n2', 'n3','n4', 'ood'],
+                         'r5':['base', 'n1', 'n2', 'n3','n5', 'ood']}
 
     processor = processors[task_name]()
     output_mode = output_modes[task_name]
+    banking77_class_list, ood_class_set, class_2_split = load_class_names()
 
-    path = '/export/home/Dataset/incrementalFewShotTextClassification/wenpeng/'
-    train_examples, dev_examples, test_examples, label_list = processor.get_Banking77(path+'round.base.train.txt', path+'round.base.dev.txt', path+'round.base.test.txt')
-    label_list_with_ood = label_list+['ood']
+    round_list = round_name_2_rounds.get(round_name)
+    train_examples, train_class_list = processor.load_train(round_list[:-1]) #we do not use ood as training
+    dev_examples, dev_class_list = processor.load_dev_or_test(round_list, train_class_list, 'dev')
+    test_examples, test_class_list = processor.load_dev_or_test(round_list, dev_class_list, 'test')
+
+    test_split_list = []
+    for test_class_i in test_class_list:
+        test_split_list.append(class_2_split.get(test_class_i))
+
+    '''verify classes'''
+    for class_i in train_class_list:
+        if class_i  in ood_class_set:
+            print('training class is ood')
+            exit(0)
+    for class_i in test_class_list[-7:]:
+        if class_i not in ood_class_set:
+            print('one of the last 7 eval class is not ood')
+            exit(0)
+
+    label_list = train_class_list
+
     num_labels = len(label_list)
-    print('num_labels:', num_labels, 'training size:', len(train_examples), 'dev size:', len(dev_examples), 'test size:', len(test_examples))
-
-    num_train_optimization_steps = None
-    num_train_optimization_steps = int(
-        len(train_examples) / args.train_batch_size / args.gradient_accumulation_steps) * args.num_train_epochs
-    if args.local_rank != -1:
-        num_train_optimization_steps = num_train_optimization_steps // torch.distributed.get_world_size()
+    print('num_labels:', num_labels, 'training size:', len(train_examples)), 'dev size:', len(dev_examples), 'test size:', len(test_examples))
 
     model = RobertaForSequenceClassification(num_labels)
     tokenizer = RobertaTokenizer.from_pretrained(pretrain_model_dir, do_lower_case=args.do_lower_case)
@@ -522,76 +587,20 @@ def main():
     nb_tr_steps = 0
     tr_loss = 0
     max_test_acc = 0.0
-    max_test_acc_list = [0,0]
     max_dev_acc = 0.0
     if args.do_train:
-        train_features = convert_examples_to_features(
-            train_examples, label_list_with_ood, args.max_seq_length, tokenizer, output_mode,
-            cls_token_at_end=False,#bool(args.model_type in ['xlnet']),            # xlnet has a cls token at the end
-            cls_token=tokenizer.cls_token,
-            cls_token_segment_id=0,#2 if args.model_type in ['xlnet'] else 0,
-            sep_token=tokenizer.sep_token,
-            sep_token_extra=True,#bool(args.model_type in ['roberta']),           # roberta uses an extra separator b/w pairs of sentences, cf. github.com/pytorch/fairseq/commit/1684e166e3da03f5b600dbb7855cb98ddfcd0805
-            pad_on_left=False,#bool(args.model_type in ['xlnet']),                 # pad on the left for xlnet
-            pad_token=tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0],
-            pad_token_segment_id=0)#4 if args.model_type in ['xlnet'] else 0,)
 
-        '''load dev set'''
-        dev_features = convert_examples_to_features(
-            dev_examples, label_list_with_ood, args.max_seq_length, tokenizer, output_mode,
-            cls_token_at_end=False,#bool(args.model_type in ['xlnet']),            # xlnet has a cls token at the end
-            cls_token=tokenizer.cls_token,
-            cls_token_segment_id=0,#2 if args.model_type in ['xlnet'] else 0,
-            sep_token=tokenizer.sep_token,
-            sep_token_extra=True,#bool(args.model_type in ['roberta']),           # roberta uses an extra separator b/w pairs of sentences, cf. github.com/pytorch/fairseq/commit/1684e166e3da03f5b600dbb7855cb98ddfcd0805
-            pad_on_left=False,#bool(args.model_type in ['xlnet']),                 # pad on the left for xlnet
-            pad_token=tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0],
-            pad_token_segment_id=0)#4 if args.model_type in ['xlnet'] else 0,)
 
-        dev_all_input_ids = torch.tensor([f.input_ids for f in dev_features], dtype=torch.long)
-        dev_all_input_mask = torch.tensor([f.input_mask for f in dev_features], dtype=torch.long)
-        dev_all_segment_ids = torch.tensor([f.segment_ids for f in dev_features], dtype=torch.long)
-        dev_all_label_ids = torch.tensor([f.label_id for f in dev_features], dtype=torch.long)
 
-        dev_data = TensorDataset(dev_all_input_ids, dev_all_input_mask, dev_all_segment_ids, dev_all_label_ids)
-        dev_sampler = SequentialSampler(dev_data)
-        dev_dataloader = DataLoader(dev_data, sampler=dev_sampler, batch_size=args.eval_batch_size)
+        train_dataloader = examples_to_features(train_examples, label_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='random')
+        dev_dataloader = examples_to_features(dev_examples, test_class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='sequential')
+        test_dataloader = examples_to_features(base_test_examples, test_class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='sequential')
 
-        '''load test set'''
-        test_features = convert_examples_to_features(
-            test_examples, label_list_with_ood, args.max_seq_length, tokenizer, output_mode,
-            cls_token_at_end=False,#bool(args.model_type in ['xlnet']),            # xlnet has a cls token at the end
-            cls_token=tokenizer.cls_token,
-            cls_token_segment_id=0,#2 if args.model_type in ['xlnet'] else 0,
-            sep_token=tokenizer.sep_token,
-            sep_token_extra=True,#bool(args.model_type in ['roberta']),           # roberta uses an extra separator b/w pairs of sentences, cf. github.com/pytorch/fairseq/commit/1684e166e3da03f5b600dbb7855cb98ddfcd0805
-            pad_on_left=False,#bool(args.model_type in ['xlnet']),                 # pad on the left for xlnet
-            pad_token=tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0],
-            pad_token_segment_id=0)#4 if args.model_type in ['xlnet'] else 0,)
-
-        test_all_input_ids = torch.tensor([f.input_ids for f in test_features], dtype=torch.long)
-        test_all_input_mask = torch.tensor([f.input_mask for f in test_features], dtype=torch.long)
-        test_all_segment_ids = torch.tensor([f.segment_ids for f in test_features], dtype=torch.long)
-        test_all_label_ids = torch.tensor([f.label_id for f in test_features], dtype=torch.long)
-
-        test_data = TensorDataset(test_all_input_ids, test_all_input_mask, test_all_segment_ids, test_all_label_ids)
-        test_sampler = SequentialSampler(test_data)
-        test_dataloader = DataLoader(test_data, sampler=test_sampler, batch_size=args.eval_batch_size)
 
 
         logger.info("***** Running training *****")
         logger.info("  Num examples = %d", len(train_examples))
         logger.info("  Batch size = %d", args.train_batch_size)
-        logger.info("  Num steps = %d", num_train_optimization_steps)
-        all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
-        all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
-        all_segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype=torch.long)
-        all_label_ids = torch.tensor([f.label_id for f in train_features], dtype=torch.long)
-
-        train_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
-        train_sampler = RandomSampler(train_data)
-
-        train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=args.train_batch_size)
 
         iter_co = 0
         final_test_performance = 0.0
@@ -625,27 +634,28 @@ def main():
                 global_step += 1
                 iter_co+=1
 
-            '''
-            start evaluate on dev set after this epoch
-            '''
+            '''eval'''
             model.eval()
             logger.info("***** Running dev *****")
             logger.info("  Num examples = %d", len(dev_examples))
 
+
             eval_loss = 0
             nb_eval_steps = 0
             preds = []
-            gold_label_ids = []
-            # print('Evaluating...')
-            for input_ids, input_mask, segment_ids, label_ids in dev_dataloader:
+            gold_label_ids_raw = []
+            for _, batch in enumerate(tqdm(dev_dataloader, desc="dev")):
+                input_ids, input_mask, segment_ids, label_ids = batch
                 input_ids = input_ids.to(device)
                 input_mask = input_mask.to(device)
                 segment_ids = segment_ids.to(device)
                 label_ids = label_ids.to(device)
-                gold_label_ids+=list(label_ids.detach().cpu().numpy())
+                gold_label_ids_raw+=list(label_ids.detach().cpu().numpy())
+
 
                 with torch.no_grad():
                     logits = model(input_ids, input_mask)
+
                 if len(preds) == 0:
                     preds.append(logits.detach().cpu().numpy())
                 else:
@@ -659,19 +669,37 @@ def main():
 
             best_threshold = -0.1
             best_acc_by_threshold = 0.0
-            best_acc_by_list = [0,0]
+            best_acc_by_list = [0.0, 0.0] #seen_acc, unseen_acc
+            gold_label_ids = []
+            for gold_label_id in gold_label_ids_raw:
+                if gold_label_id >= num_labels:
+                    gold_label_ids.append(-1)
+                else:
+                    gold_label_ids.append(gold_label_id)
             for threshold in np.arange(0.99, 0.0, -0.01):
                 pred_label_ids = []
-                for pred_label, pred_prob in zip(pred_label_ids_raw, pred_max_prob):
-                    if pred_prob < threshold:
-                        pred_label_ids.append(len(label_list_with_ood)-1)
+                for i, pred_max_prob_i in enumerate(pred_max_prob):
+                    if pred_max_prob_i < threshold:
+                        pred_label_ids.append(-1) #-1 means ood
                     else:
-                        pred_label_ids.append(pred_label)
+                        pred_label_ids.append(pred_label_ids_raw[i])
 
-                gold_label_ids = gold_label_ids
                 assert len(pred_label_ids) == len(gold_label_ids)
-                test_seen_acc = acc_given_gold_labellist(pred_label_ids, gold_label_ids, list(range(num_labels)))
-                test_unseen_acc  = acc_given_gold_labellist(pred_label_ids, gold_label_ids, [num_labels])
+                test_seen_size = 0
+                test_seen_hit = 0
+                test_unseen_size = 0
+                test_unseen_hit = 0
+                for i, label_i in enumerate(gold_label_ids):
+                    if label_i == -1:
+                        test_unseen_size+=1
+                        if label_i == pred_label_ids[i]:
+                            test_unseen_hit+=1
+                    else:
+                        test_seen_size+=1
+                        if label_i == pred_label_ids[i]:
+                            test_seen_hit+=1
+                test_seen_acc = test_seen_hit/test_seen_size
+                test_unseen_acc  = test_unseen_hit/test_unseen_size
                 test_acc = (test_seen_acc+test_unseen_acc)*0.5 #acc_given_gold_labellist(pred_label_ids, gold_label_ids, list(range(num_labels+1)))
                 if test_acc > best_acc_by_threshold:
                     best_acc_by_threshold = test_acc
@@ -713,36 +741,51 @@ def main():
                 pred_max_prob = list(np.amax(pred_probs, axis=1))
 
                 pred_label_ids = []
-                for pred_label, pred_prob in zip(pred_label_ids_raw, pred_max_prob):
-                    if pred_prob < best_threshold:
-                        pred_label_ids.append(len(label_list_with_ood)-1)
+                for i, pred_max_prob_i in enumerate(pred_max_prob):
+                    if pred_max_prob_i < best_threshold:
+                        pred_label_ids.append(-1) #-1 means ood
                     else:
-                        pred_label_ids.append(pred_label)
+                        pred_label_ids.append(pred_label_ids_raw[i])
+
 
                 gold_label_ids = gold_label_ids
                 assert len(pred_label_ids) == len(gold_label_ids)
+                acc_each_round = []
+                for round_name_id in round_list:
+                    #base, n1, n2, ood
+                    round_size = 0
+                    rount_hit = 0
+                    if round_name_id != 'ood':
+                        for ii, gold_label_id in enumerate(gold_label_ids):
+                            if test_split_list[gold_label_id] == round_name_id:
+                                round_size+=1
+                                if gold_label_id == pred_label_ids[ii]:
+                                    rount_hit+=1
+                        acc_i = rount_hit/round_size
+                        acc_each_round.append(acc_i)
+                    else:
+                        '''ood acc'''
+                        for ii, gold_label_id in enumerate(gold_label_ids):
+                            if test_split_list[gold_label_id] == round_name_id:
+                                round_size+=1
+                                if pred_label_ids[ii]==-1:
+                                    rount_hit+=1
+                        acc_i = rount_hit/round_size
+                        acc_each_round.append(acc_i)
 
-                test_seen_acc = acc_given_gold_labellist(pred_label_ids, gold_label_ids, list(range(num_labels)))
-                test_unseen_acc  = acc_given_gold_labellist(pred_label_ids, gold_label_ids, [num_labels])
-                test_acc = (test_seen_acc+test_unseen_acc)*0.5 #acc_given_gold_labellist(pred_label_ids, gold_label_ids, list(range(num_labels+1)))
-
-                if test_acc > max_test_acc:
-                    max_test_acc = test_acc
-                    max_test_acc_list = [test_seen_acc, test_unseen_acc]
-                print('\n\t\t test_acc:', [test_seen_acc, test_unseen_acc], 'max_test_acc', max_test_acc_list)
-                final_test_performance = [test_seen_acc, test_unseen_acc]
+                print('\n\t\t test_acc:', acc_each_round)
+                final_test_performance = acc_each_round
             else:
                 print('\ndev acc:', best_acc_by_list, 'threshold:', best_threshold,' max_dev_acc:', max_dev_acc, '\n')
 
         print('final_test_performance:', final_test_performance)
-
-
+        
 if __name__ == "__main__":
     main()
 
 '''
 
-CUDA_VISIBLE_DEVICES=6 python -u train.round.base.classifier.py --task_name rte --do_train --do_lower_case --num_train_epochs 10 --train_batch_size 16 --eval_batch_size 64 --learning_rate 1e-5 --max_seq_length 128 --seed 42
+CUDA_VISIBLE_DEVICES=3 python -u train.base.binary.same.class.py --task_name rte --do_train --do_lower_case --num_train_epochs 3 --train_batch_size 20 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 128 --seed 42
 
 
 '''
