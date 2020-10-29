@@ -562,7 +562,7 @@ def main():
     '''verify classes'''
     for class_i in train_class_list:
         if class_i  in ood_class_set:
-            print('training class is ood')
+            print('training class is ood:', class_i)
             exit(0)
     for class_i in test_class_list[-7:]:
         if class_i not in ood_class_set:
