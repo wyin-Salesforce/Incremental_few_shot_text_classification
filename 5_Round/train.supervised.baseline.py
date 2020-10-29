@@ -560,8 +560,7 @@ def main():
         test_split_list.append(class_2_split.get(test_class_i))
 
     '''verify classes'''
-    print('train_class_list:', len(train_class_list))
-    for class_i in train_class_list:
+    for class_i in test_class_list[:-7]:
         if class_i  in ood_class_set:
             print('training class is ood:', class_i)
             exit(0)
@@ -570,7 +569,7 @@ def main():
             print('one of the last 7 eval class is not ood')
             exit(0)
 
-    label_list = train_class_list
+    label_list = test_class_list[:-7]
 
     num_labels = len(label_list)
     print('num_labels:', num_labels, 'training size:', len(train_examples), 'dev size:', len(dev_examples), 'test size:', len(test_examples))
