@@ -732,7 +732,7 @@ def main():
                 if test_acc > best_acc_by_threshold:
                     best_acc_by_threshold = test_acc
                     best_threshold = threshold
-                    best_acc_by_list = [test_seen_acc, test_unseen_acc]
+                    best_acc_by_list = acc_each_round
 
             dev_acc = best_acc_by_threshold
             if dev_acc > max_dev_acc:
