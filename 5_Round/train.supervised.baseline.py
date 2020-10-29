@@ -572,7 +572,7 @@ def main():
     label_list = train_class_list
 
     num_labels = len(label_list)
-    print('num_labels:', num_labels, 'training size:', len(train_examples)), 'dev size:', len(dev_examples), 'test size:', len(test_examples))
+    print('num_labels:', num_labels, 'training size:', len(train_examples), 'dev size:', len(dev_examples), 'test size:', len(test_examples))
 
     model = RobertaForSequenceClassification(num_labels)
     tokenizer = RobertaTokenizer.from_pretrained(pretrain_model_dir, do_lower_case=args.do_lower_case)
