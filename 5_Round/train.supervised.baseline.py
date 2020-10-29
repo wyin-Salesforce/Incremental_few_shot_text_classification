@@ -162,7 +162,7 @@ class RteProcessor(DataProcessor):
         find_class_list = []
         examples = []
         for round in round_list:
-            filename = '/export/home/Dataset/incrementalFewShotTextClassification/Incremental-few-shot-text-classification-master/dataset/banking77/split/'+'train.txt'
+            filename = '/export/home/Dataset/incrementalFewShotTextClassification/Incremental-few-shot-text-classification-master/dataset/banking77/split/'+round+'/train.txt'
             readfile = codecs.open(filename, 'r', 'utf-8')
             for row in readfile:
                 parts = row.strip().split('\t')
@@ -187,7 +187,7 @@ class RteProcessor(DataProcessor):
         # find_class_list = []
         examples = []
         for round in round_list:
-            filename = '/export/home/Dataset/incrementalFewShotTextClassification/Incremental-few-shot-text-classification-master/dataset/banking77/split/'+flag+'.txt'
+            filename = '/export/home/Dataset/incrementalFewShotTextClassification/Incremental-few-shot-text-classification-master/dataset/banking77/split/'+round+'/'+flag+'.txt'
             readfile = codecs.open(filename, 'r', 'utf-8')
             for row in readfile:
                 parts = row.strip().split('\t')
