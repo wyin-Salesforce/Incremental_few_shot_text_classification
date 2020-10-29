@@ -335,7 +335,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
                 InputFeatures(input_ids=input_ids,
                               input_mask=input_mask,
                               segment_ids=segment_ids,
-                              label_id=label_id)
+                              label_id=label_id))
     return features
 
 def _truncate_seq_pair(tokens_a, tokens_b, max_length):
@@ -425,6 +425,10 @@ def main():
                         help="The name of the task to train.")
     ## Other parameters
     parser.add_argument("--cache_dir",
+                        default="",
+                        type=str,
+                        help="Where do you want to store the pre-trained models downloaded from s3")
+    parser.add_argument("--round_name",
                         default="",
                         type=str,
                         help="Where do you want to store the pre-trained models downloaded from s3")
@@ -546,7 +550,7 @@ def main():
     output_mode = output_modes[task_name]
     banking77_class_list, ood_class_set, class_2_split = load_class_names()
 
-    round_list = round_name_2_rounds.get(round_name)
+    round_list = round_name_2_rounds.get(args.round_name)
     train_examples, train_class_list = processor.load_train(round_list[:-1]) #we do not use ood as training
     dev_examples, dev_class_list = processor.load_dev_or_test(round_list, train_class_list, 'dev')
     test_examples, test_class_list = processor.load_dev_or_test(round_list, dev_class_list, 'test')
@@ -779,13 +783,13 @@ def main():
                 print('\ndev acc:', best_acc_by_list, 'threshold:', best_threshold,' max_dev_acc:', max_dev_acc, '\n')
 
         print('final_test_performance:', final_test_performance)
-        
+
 if __name__ == "__main__":
     main()
 
 '''
 
-CUDA_VISIBLE_DEVICES=3 python -u train.base.binary.same.class.py --task_name rte --do_train --do_lower_case --num_train_epochs 3 --train_batch_size 20 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 128 --seed 42
+CUDA_VISIBLE_DEVICES=3 python -u train.supervised.baseline.py --task_name rte --do_train --do_lower_case --num_train_epochs 3 --train_batch_size 20 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 128 --seed 42 --round_name 'r1'
 
 
 '''
