@@ -598,7 +598,7 @@ def main():
 
         train_dataloader = examples_to_features(train_examples, label_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='random')
         dev_dataloader = examples_to_features(dev_examples, test_class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='sequential')
-        test_dataloader = examples_to_features(base_test_examples, test_class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='sequential')
+        test_dataloader = examples_to_features(test_examples, test_class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='sequential')
 
 
 
