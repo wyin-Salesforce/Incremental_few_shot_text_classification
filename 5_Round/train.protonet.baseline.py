@@ -561,7 +561,7 @@ def main():
                          'r4':['base', 'n1', 'n2', 'n3','n4', 'ood'],
                          'r5':['base', 'n1', 'n2', 'n3','n4', 'n5', 'ood']}
 
-    model = RobertaForSequenceClassification(10) #10 is a random number, can be changed
+    model = RobertaForSequenceClassification(2) #10 is a random number, can be changed
     tokenizer = RobertaTokenizer.from_pretrained(pretrain_model_dir, do_lower_case=args.do_lower_case)
     model.to(device)
 
