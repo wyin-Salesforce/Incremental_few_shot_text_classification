@@ -586,7 +586,7 @@ def main():
         train_support_dataloader_list = []
 
         for train_support_examples_per_class in train_support_examples_list:
-            train_support_dataloader = examples_to_features(train_support_examples_per_class, selected_class_list, args, tokenizer, 5, "classification", dataloader_mode='random')
+            train_support_dataloader = examples_to_features(train_support_examples_per_class, selected_class_list, args, tokenizer, 2, "classification", dataloader_mode='random')
             train_support_dataloader_list.append(train_support_dataloader)
         train_query_dataloader = examples_to_features(full_query_examples, selected_class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='random')
 
