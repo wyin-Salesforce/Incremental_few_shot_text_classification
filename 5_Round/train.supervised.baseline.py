@@ -544,7 +544,7 @@ def main():
                          'r2':['base', 'n1', 'n2', 'ood'],
                          'r3':['base', 'n1', 'n2', 'n3', 'ood'],
                          'r4':['base', 'n1', 'n2', 'n3','n4', 'ood'],
-                         'r5':['base', 'n1', 'n2', 'n3','n5', 'ood']}
+                         'r5':['base', 'n1', 'n2', 'n3','n4', 'n5', 'ood']}
 
     processor = processors[task_name]()
     output_mode = output_modes[task_name]
