@@ -73,15 +73,14 @@ class RobertaForSequenceClassification(nn.Module):
         self.tagset_size = tagset_size
 
         self.roberta_single= RobertaModel.from_pretrained(pretrain_model_dir)
-        # self.roberta_single.load_state_dict(torch.load('/export/home/Dataset/BERT_pretrained_mine/MNLI_pretrained/_acc_0.9040886899918633.pt'), strict=False)
         self.single_hidden2tag = RobertaClassificationHead(bert_hidden_dim, tagset_size)
 
     def forward(self, input_ids, input_mask):
         outputs_single = self.roberta_single(input_ids, input_mask, None)
         hidden_states_single = outputs_single[1]#torch.tanh(self.hidden_layer_2(torch.tanh(self.hidden_layer_1(outputs_single[1])))) #(batch, hidden)
 
-        score_single = self.single_hidden2tag(hidden_states_single) #(batch, tag_set)
-        return score_single
+        last_hidden, score_single = self.single_hidden2tag(hidden_states_single) #(batch, tag_set)
+        return last_hidden, score_single
 
 
 
@@ -98,10 +97,10 @@ class RobertaClassificationHead(nn.Module):
         x = features#[:, 0, :]  # take <s> token (equiv. to [CLS])
         x = self.dropout(x)
         x = self.dense(x)
-        x = torch.tanh(x)
-        x = self.dropout(x)
+        last_hidden = torch.tanh(x)
+        x = self.dropout(last_hidden)
         x = self.out_proj(x)
-        return x
+        return last_hidden, x
 
 
 
@@ -158,23 +157,39 @@ class DataProcessor(object):
 class RteProcessor(DataProcessor):
     """Processor for the RTE data set (GLUE version)."""
 
-    def load_train(self, round_list):
-        find_class_list = []
-        examples = []
-        for round in round_list:
-            filename = '/export/home/Dataset/incrementalFewShotTextClassification/Incremental-few-shot-text-classification-master/dataset/banking77/split/'+round+'/train.txt'
-            readfile = codecs.open(filename, 'r', 'utf-8')
-            for row in readfile:
-                parts = row.strip().split('\t')
-                assert len(parts)==2
-                class_name = parts[0].strip()
-                if class_name not in set(find_class_list):
-                    find_class_list.append(class_name)
-                example_str = parts[1].strip()
-                examples.append(
-                    InputExample(guid='train', text_a=example_str, text_b=None, label=class_name))
-            readfile.close()
-        return examples, find_class_list
+    def load_train(self):
+        class_2_examples = {}
+
+        round = 'base'
+        filename = '/export/home/Dataset/incrementalFewShotTextClassification/Incremental-few-shot-text-classification-master/dataset/banking77/split/'+round+'/train.txt'
+        readfile = codecs.open(filename, 'r', 'utf-8')
+        for row in readfile:
+            parts = row.strip().split('\t')
+            assert len(parts)==2
+            class_name = parts[0].strip()
+            example_str = parts[1].strip()
+            input_example = InputExample(guid='train', text_a=example_str, text_b=None, label=class_name)
+            examples = class_2_examples.get(class_name)
+            if examples is None:
+                examples = []
+            examples.append(input_example)
+            class_2_examples[class_name] = examples
+
+        readfile.close()
+        '''select 10 random classes'''
+        selected_classes = random.sample(list(class_2_examples.keys()), 10)
+        support_example_list = []
+        query_example_list = []
+        for selected_class_i in selected_classes:
+            example_candidates = class_2_examples.get(selected_class_i)
+            random.shuffle(example_candidates)
+            support_examples = example_candidates[:5]
+            query_examples = example_candidates[5:]
+            support_example_list.append(support_examples)
+            query_example_list.append(query_examples)
+
+
+        return support_example_list, query_example_list
 
 
 
@@ -546,12 +561,45 @@ def main():
                          'r4':['base', 'n1', 'n2', 'n3','n4', 'ood'],
                          'r5':['base', 'n1', 'n2', 'n3','n4', 'n5', 'ood']}
 
+    model = RobertaForSequenceClassification(10) #10 is a random number, can be changed
+    tokenizer = RobertaTokenizer.from_pretrained(pretrain_model_dir, do_lower_case=args.do_lower_case)
+    model.to(device)
+
+    param_optimizer = list(model.named_parameters())
+    no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+    optimizer_grouped_parameters = [
+        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+        ]
+
+    optimizer = AdamW(optimizer_grouped_parameters,
+                             lr=args.learning_rate)
+
     processor = processors[task_name]()
     output_mode = output_modes[task_name]
     banking77_class_list, ood_class_set, class_2_split = load_class_names()
 
     round_list = round_name_2_rounds.get(args.round_name)
-    train_examples, train_class_list = processor.load_train(round_list[:-1]) #we do not use ood as training
+    for _ in range(20:):
+        train_support_examples_list, train_query_examples_list = processor.load_train() #we do not use ood as training
+        train_support_dataloader_list = []
+        train_query_dataloader_list = []
+        for train_support_examples_per_class, train_query_examples_per_class in zip(train_support_examples_list, train_query_examples_list):
+            train_support_dataloader = examples_to_features(train_support_examples_per_class, banking77_class_list, args, tokenizer, 5, "classification", dataloader_mode='random')
+            train_support_dataloader_list.append(train_support_dataloader)
+            train_query_dataloader = examples_to_features(train_query_examples_per_class, banking77_class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='random')
+            train_query_dataloader_list.append(train_query_dataloader)
+
+        '''first compute class prototype rep'''
+        model.train()
+        for train_support_dataloader in train_support_dataloader_list:
+                 for batch in train_support_dataloader:
+                     batch = tuple(t.to(device) for t in batch)
+                     input_ids, input_mask, _, _ = batch
+
+                     last_hidden_batch, _ = model(input_ids, input_mask)
+
+
     dev_examples, dev_class_list = processor.load_dev_or_test(round_list, train_class_list, 'dev')
     test_examples, test_class_list = processor.load_dev_or_test(round_list, dev_class_list, 'test')
 
