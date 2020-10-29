@@ -605,6 +605,7 @@ def main():
             class_rep = torch.mean(torch.cat(class_reps, axis=0), axis=0, keepdim=True)
             all_class_proto_reps.append(class_rep)
         all_class_proto_reps = torch.cat(all_class_proto_reps, axis=0) #(#class, hidden)
+        print('class rep build over')
         '''then compute rep for query batch'''
         for batch in train_query_dataloader:
             batch = tuple(t.to(device) for t in batch)
