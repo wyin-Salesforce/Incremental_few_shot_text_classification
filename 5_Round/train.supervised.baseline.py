@@ -560,6 +560,7 @@ def main():
         test_split_list.append(class_2_split.get(test_class_i))
 
     '''verify classes'''
+    print('train_class_list:', len(train_class_list))
     for class_i in train_class_list:
         if class_i  in ood_class_set:
             print('training class is ood:', class_i)
