@@ -1,5 +1,5 @@
 export BATCHSIZE=20
-export EPOCHSIZE=30
+export EPOCHSIZE=50
 export SEED=42 #42, 16, 32, 64, 128
 export LEARNINGRATE=1e-6
 
