@@ -595,14 +595,16 @@ def main():
         model.train()
         all_class_proto_reps = []
         for train_support_dataloader in train_support_dataloader_list:
-            class_reps = []
+            class_reps = torch.zeros(1, bert_hidden_dim).to(device)
+            batch_size_accu = 0
             for batch in train_support_dataloader:
                 batch = tuple(t.to(device) for t in batch)
                 input_ids, input_mask, _, _ = batch
 
                 last_hidden_batch, _ = model(input_ids, input_mask)
-                class_reps.append(torch.mean(last_hidden_batch, axis=0, keepdim=True))
-            class_rep = torch.mean(torch.cat(class_reps, axis=0), axis=0, keepdim=True)
+                class_reps+=torch.mean(last_hidden_batch, axis=0, keepdim=True)
+                batch_size_accu+=1
+            class_rep = class_reps/batch_size_accu
             all_class_proto_reps.append(class_rep)
         all_class_proto_reps = torch.cat(all_class_proto_reps, axis=0) #(#class, hidden)
         print('class rep build over')
