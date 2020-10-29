@@ -581,7 +581,7 @@ def main():
 
     round_list = round_name_2_rounds.get(args.round_name)
     '''training'''
-    for _ in range(20:):
+    for _ in range(20):
         train_support_examples_list, full_query_examples, selected_class_list = processor.load_train() #we do not use ood as training
         train_support_dataloader_list = []
 
