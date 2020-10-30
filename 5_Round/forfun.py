@@ -10,7 +10,8 @@ def statistics():
             lens = len(sent)
             len2count[lens]+=1
     print('len2count:', len2count)
-    print(sorted(len2count))
+    sorted(len2count.items())
+    print(len2count)
 
 
 if __name__ == "__main__":
