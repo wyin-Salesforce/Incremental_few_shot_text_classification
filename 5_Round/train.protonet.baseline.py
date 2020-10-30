@@ -157,7 +157,7 @@ class DataProcessor(object):
 class RteProcessor(DataProcessor):
     """Processor for the RTE data set (GLUE version)."""
 
-    def load_train(self):
+    def load_base_train(self):
         class_2_examples = {}
 
         round = 'base'
@@ -192,14 +192,45 @@ class RteProcessor(DataProcessor):
         return support_example_list, full_query_examples, selected_classes
 
 
+    def load_support_all_rounds(self, round_list):
+        class_2_examples = {}
+
+        base_class_list = set()
+        for round in round_list:
+            filename = '/export/home/Dataset/incrementalFewShotTextClassification/Incremental-few-shot-text-classification-master/dataset/banking77/split/'+round+'/train.txt'
+            readfile = codecs.open(filename, 'r', 'utf-8')
+            for row in readfile:
+                parts = row.strip().split('\t')
+                assert len(parts)==2
+                class_name = parts[0].strip()
+                if round == 'base':
+                    base_class_list.add(class_name)
+                example_str = parts[1].strip()
+                input_example = InputExample(guid='train', text_a=example_str, text_b=None, label=class_name)
+                examples = class_2_examples.get(class_name)
+                if examples is None:
+                    examples = []
+                examples.append(input_example)
+                class_2_examples[class_name] = examples
+
+            readfile.close()
+        '''select 5 examples for base classes'''
+        assert len(base_class_list) ==  20
+        for base_class in base_class_list:
+            example_candidates = class_2_examples.get(base_class)
+            random.shuffle(example_candidates)
+            support_examples = example_candidates[:5]
+            class_2_examples[base_class] = support_examples
 
 
+        return class_2_examples
 
-    def load_dev_or_test(self, round_list, find_class_list, flag):
+
+    def load_dev_or_test(self, round_list, flag):
         '''
         find_class_list: classes in training, i.e., seen classes
         '''
-        # find_class_list = []
+        find_class_list = []
         examples = []
         for round in round_list:
             filename = '/export/home/Dataset/incrementalFewShotTextClassification/Incremental-few-shot-text-classification-master/dataset/banking77/split/'+round+'/'+flag+'.txt'
@@ -561,6 +592,9 @@ def main():
                          'r4':['base', 'n1', 'n2', 'n3','n4', 'ood'],
                          'r5':['base', 'n1', 'n2', 'n3','n4', 'n5', 'ood']}
 
+
+
+
     model = RobertaForSequenceClassification(2) #10 is a random number, can be changed
     tokenizer = RobertaTokenizer.from_pretrained(pretrain_model_dir, do_lower_case=args.do_lower_case)
     model.to(device)
@@ -580,9 +614,35 @@ def main():
     banking77_class_list, ood_class_set, class_2_split = load_class_names()
 
     round_list = round_name_2_rounds.get(args.round_name)
+    '''support for all seen classes'''
+    class_2_support_examples = load_support_all_rounds(self, round_list[:-1]) #no support set for ood
+    seen_class_list = list(class_2_support_examples.keys())
+    support_example_lists = [class_2_support_examples.get(seen_class)  for seen_class in seen_class_list]
+    '''dev and test'''
+    dev_examples, dev_class_list = processor.load_dev_or_test(round_list, 'dev')
+    test_examples, test_class_list = processor.load_dev_or_test(round_list, 'test')
+    assert len(set(dev_class_list) | set(test_class_list)) = len(set(dev_class_list))
+    assert len(test_class_list) == len(seen_class_list)+7
+    eval_class_list = seen_class_list+list(ood_class_set)
+
+    test_split_list = []
+    for test_class_i in eval_class_list:
+        test_split_list.append(class_2_split.get(test_class_i))
+
+    eval_support_dataloader_list = []
+
+    for eval_support_examples_per_class in support_example_lists:
+        support_dataloader = examples_to_features(eval_support_examples_per_class, seen_class_list, args, tokenizer, 5, "classification", dataloader_mode='random')
+        eval_support_dataloader_list.append(support_dataloader)
+    dev_query_dataloader = examples_to_features(dev_examples, eval_class_list, args, tokenizer, args.eval_batch_size, "classification", dataloader_mode='random')
+    test_query_dataloader = examples_to_features(test_examples, eval_class_list, args, tokenizer, args.eval_batch_size, "classification", dataloader_mode='random')
+
+
     '''training'''
+    max_test_acc = 0.0
+    max_dev_acc = 0.0
     for _ in range(20):
-        train_support_examples_list, full_query_examples, selected_class_list = processor.load_train() #we do not use ood as training
+        train_support_examples_list, full_query_examples, selected_class_list = processor.load_base_train() #we do not use ood as training
         train_support_dataloader_list = []
 
         for train_support_examples_per_class in train_support_examples_list:
@@ -631,263 +691,171 @@ def main():
             optimizer.zero_grad()
 
         '''evaluation'''
-    #
-    #
-    # dev_examples, dev_class_list = processor.load_dev_or_test(round_list, train_class_list, 'dev')
-    # test_examples, test_class_list = processor.load_dev_or_test(round_list, dev_class_list, 'test')
-    #
-    # test_split_list = []
-    # for test_class_i in test_class_list:
-    #     test_split_list.append(class_2_split.get(test_class_i))
-    #
-    # '''verify classes'''
-    # for class_i in test_class_list[:-7]:
-    #     if class_i  in ood_class_set:
-    #         print('training class is ood:', class_i)
-    #         exit(0)
-    # for class_i in test_class_list[-7:]:
-    #     if class_i not in ood_class_set:
-    #         print('one of the last 7 eval class is not ood')
-    #         exit(0)
-    #
-    # label_list = test_class_list[:-7]
-    #
-    # num_labels = len(label_list)
-    # print('num_labels:', num_labels, 'training size:', len(train_examples), 'dev size:', len(dev_examples), 'test size:', len(test_examples))
-    #
-    # model = RobertaForSequenceClassification(num_labels)
-    # tokenizer = RobertaTokenizer.from_pretrained(pretrain_model_dir, do_lower_case=args.do_lower_case)
-    # model.to(device)
-    #
-    # param_optimizer = list(model.named_parameters())
-    # no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
-    # optimizer_grouped_parameters = [
-    #     {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-    #     {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-    #     ]
-    #
-    # optimizer = AdamW(optimizer_grouped_parameters,
-    #                          lr=args.learning_rate)
-    # global_step = 0
-    # nb_tr_steps = 0
-    # tr_loss = 0
-    # max_test_acc = 0.0
-    # max_dev_acc = 0.0
-    # if args.do_train:
-    #
-    #
-    #
-    #     train_dataloader = examples_to_features(train_examples, label_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='random')
-    #     dev_dataloader = examples_to_features(dev_examples, test_class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='sequential')
-    #     test_dataloader = examples_to_features(test_examples, test_class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='sequential')
-    #
-    #
-    #
-    #     logger.info("***** Running training *****")
-    #     logger.info("  Num examples = %d", len(train_examples))
-    #     logger.info("  Batch size = %d", args.train_batch_size)
-    #
-    #     iter_co = 0
-    #     final_test_performance = 0.0
-    #     for _ in trange(int(args.num_train_epochs), desc="Epoch"):
-    #         tr_loss = 0
-    #         nb_tr_examples, nb_tr_steps = 0, 0
-    #         for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
-    #             model.train()
-    #             batch = tuple(t.to(device) for t in batch)
-    #             input_ids, input_mask, segment_ids, label_ids = batch
-    #
-    #
-    #             logits = model(input_ids, input_mask)
-    #             loss_fct = CrossEntropyLoss()
-    #
-    #             loss = loss_fct(logits.view(-1, num_labels), label_ids.view(-1))
-    #
-    #             if n_gpu > 1:
-    #                 loss = loss.mean() # mean() to average on multi-gpu.
-    #             if args.gradient_accumulation_steps > 1:
-    #                 loss = loss / args.gradient_accumulation_steps
-    #
-    #             loss.backward()
-    #
-    #             tr_loss += loss.item()
-    #             nb_tr_examples += input_ids.size(0)
-    #             nb_tr_steps += 1
-    #
-    #             optimizer.step()
-    #             optimizer.zero_grad()
-    #             global_step += 1
-    #             iter_co+=1
-    #
-    #         '''eval'''
-    #         model.eval()
-    #         logger.info("***** Running dev *****")
-    #         logger.info("  Num examples = %d", len(dev_examples))
-    #
-    #
-    #         eval_loss = 0
-    #         nb_eval_steps = 0
-    #         preds = []
-    #         gold_label_ids_raw = []
-    #         for _, batch in enumerate(tqdm(dev_dataloader, desc="dev")):
-    #             input_ids, input_mask, segment_ids, label_ids = batch
-    #             input_ids = input_ids.to(device)
-    #             input_mask = input_mask.to(device)
-    #             segment_ids = segment_ids.to(device)
-    #             label_ids = label_ids.to(device)
-    #             gold_label_ids_raw+=list(label_ids.detach().cpu().numpy())
-    #
-    #
-    #             with torch.no_grad():
-    #                 logits = model(input_ids, input_mask)
-    #
-    #             if len(preds) == 0:
-    #                 preds.append(logits.detach().cpu().numpy())
-    #             else:
-    #                 preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
-    #
-    #         preds = preds[0]
-    #
-    #         pred_probs = softmax(preds,axis=1)
-    #         pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
-    #         pred_max_prob = list(np.amax(pred_probs, axis=1))
-    #
-    #         best_threshold = -0.1
-    #         best_acc_by_threshold = 0.0
-    #         best_acc_by_list = [0.0, 0.0] #seen_acc, unseen_acc
-    #         gold_label_ids = []
-    #         for gold_label_id in gold_label_ids_raw:
-    #             if gold_label_id >= num_labels:
-    #                 gold_label_ids.append(-1)
-    #             else:
-    #                 gold_label_ids.append(gold_label_id)
-    #         for threshold in np.arange(0.99, 0.0, -0.01):
-    #             pred_label_ids = []
-    #             for i, pred_max_prob_i in enumerate(pred_max_prob):
-    #                 if pred_max_prob_i < threshold:
-    #                     pred_label_ids.append(-1) #-1 means ood
-    #                 else:
-    #                     pred_label_ids.append(pred_label_ids_raw[i])
-    #
-    #             assert len(pred_label_ids) == len(gold_label_ids)
-    #             acc_each_round = []
-    #             for round_name_id in round_list:
-    #                 #base, n1, n2, ood
-    #                 round_size = 0
-    #                 rount_hit = 0
-    #                 if round_name_id != 'ood':
-    #                     for ii, gold_label_id in enumerate(gold_label_ids):
-    #                         if test_split_list[gold_label_id] == round_name_id:
-    #                             round_size+=1
-    #                             if gold_label_id == pred_label_ids[ii]:
-    #                                 rount_hit+=1
-    #                     acc_i = rount_hit/round_size
-    #                     acc_each_round.append(acc_i)
-    #                 else:
-    #                     '''ood acc'''
-    #                     for ii, gold_label_id in enumerate(gold_label_ids):
-    #                         if test_split_list[gold_label_id] == round_name_id:
-    #                             round_size+=1
-    #                             if pred_label_ids[ii]==-1:
-    #                                 rount_hit+=1
-    #                     acc_i = rount_hit/round_size
-    #                     acc_each_round.append(acc_i)
-    #
-    #             # test_seen_size = 0
-    #             # test_seen_hit = 0
-    #             # test_unseen_size = 0
-    #             # test_unseen_hit = 0
-    #             # for i, label_i in enumerate(gold_label_ids):
-    #             #     if label_i == -1:
-    #             #         test_unseen_size+=1
-    #             #         if label_i == pred_label_ids[i]:
-    #             #             test_unseen_hit+=1
-    #             #     else:
-    #             #         test_seen_size+=1
-    #             #         if label_i == pred_label_ids[i]:
-    #             #             test_seen_hit+=1
-    #             # test_seen_acc = test_seen_hit/test_seen_size
-    #             # test_unseen_acc  = test_unseen_hit/test_unseen_size
-    #             # test_acc = (test_seen_acc+test_unseen_acc)*0.5 #acc_given_gold_labellist(pred_label_ids, gold_label_ids, list(range(num_labels+1)))
-    #             test_acc = np.mean(acc_each_round)
-    #             if test_acc > best_acc_by_threshold:
-    #                 best_acc_by_threshold = test_acc
-    #                 best_threshold = threshold
-    #                 best_acc_by_list = acc_each_round
-    #
-    #         dev_acc = best_acc_by_threshold
-    #         if dev_acc > max_dev_acc:
-    #             max_dev_acc = dev_acc
-    #             print('\ndev acc:', best_acc_by_list, 'threshold:', best_threshold,' max_dev_acc:', max_dev_acc, '\n')
-    #
-    #
-    #             logger.info("***** Running test *****")
-    #             logger.info("  Num examples = %d", len(test_examples))
-    #
-    #             eval_loss = 0
-    #             nb_eval_steps = 0
-    #             preds = []
-    #             gold_label_ids = []
-    #             # print('Evaluating...')
-    #             for input_ids, input_mask, segment_ids, label_ids in test_dataloader:
-    #                 input_ids = input_ids.to(device)
-    #                 input_mask = input_mask.to(device)
-    #                 segment_ids = segment_ids.to(device)
-    #                 label_ids = label_ids.to(device)
-    #                 gold_label_ids+=list(label_ids.detach().cpu().numpy())
-    #
-    #                 with torch.no_grad():
-    #                     logits = model(input_ids, input_mask)
-    #                 if len(preds) == 0:
-    #                     preds.append(logits.detach().cpu().numpy())
-    #                 else:
-    #                     preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
-    #
-    #             preds = preds[0]
-    #
-    #             pred_probs = softmax(preds,axis=1)
-    #             pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
-    #             pred_max_prob = list(np.amax(pred_probs, axis=1))
-    #
-    #             pred_label_ids = []
-    #             for i, pred_max_prob_i in enumerate(pred_max_prob):
-    #                 if pred_max_prob_i < best_threshold:
-    #                     pred_label_ids.append(-1) #-1 means ood
-    #                 else:
-    #                     pred_label_ids.append(pred_label_ids_raw[i])
-    #
-    #
-    #             gold_label_ids = gold_label_ids
-    #             assert len(pred_label_ids) == len(gold_label_ids)
-    #             acc_each_round = []
-    #             for round_name_id in round_list:
-    #                 #base, n1, n2, ood
-    #                 round_size = 0
-    #                 rount_hit = 0
-    #                 if round_name_id != 'ood':
-    #                     for ii, gold_label_id in enumerate(gold_label_ids):
-    #                         if test_split_list[gold_label_id] == round_name_id:
-    #                             round_size+=1
-    #                             if gold_label_id == pred_label_ids[ii]:
-    #                                 rount_hit+=1
-    #                     acc_i = rount_hit/round_size
-    #                     acc_each_round.append(acc_i)
-    #                 else:
-    #                     '''ood acc'''
-    #                     for ii, gold_label_id in enumerate(gold_label_ids):
-    #                         if test_split_list[gold_label_id] == round_name_id:
-    #                             round_size+=1
-    #                             if pred_label_ids[ii]==-1:
-    #                                 rount_hit+=1
-    #                     acc_i = rount_hit/round_size
-    #                     acc_each_round.append(acc_i)
-    #
-    #             print('\n\t\t test_acc:', acc_each_round)
-    #             final_test_performance = acc_each_round
-    #         else:
-    #             print('\ndev acc:', best_acc_by_list, 'threshold:', best_threshold,' max_dev_acc:', max_dev_acc, '\n')
-    #
-    #     print('final_test_performance:', final_test_performance)
+        model.eval()
+        '''first get class proty rep'''
+        all_class_proto_reps = []
+        for support_dataloader in eval_support_dataloader_list:
+            class_reps = torch.zeros(1, bert_hidden_dim).to(device)
+            batch_size_accu = 0
+            for batch in support_dataloader:
+                batch = tuple(t.to(device) for t in batch)
+                input_ids, input_mask, _, _ = batch
+                with torch.no_grad():
+                    last_hidden_batch, _ = model(input_ids, input_mask)
+                class_reps+=torch.mean(last_hidden_batch, axis=0, keepdim=True)
+                batch_size_accu+=1
+            class_rep = class_reps/batch_size_accu
+            all_class_proto_reps.append(class_rep)
+        all_class_proto_reps = torch.cat(all_class_proto_reps, axis=0) #(#class, hidden)
+        support_normalized_rep = all_class_proto_reps/(1e-8+torch.sqrt(torch.sum(torch.square(all_class_proto_reps), axis=1, keepdim=True)))
+        '''dev'''
+        logger.info("***** Running dev *****")
+        logger.info("  Num examples = %d", len(dev_examples))
+        preds = []
+        gold_label_ids_raw = []
+        for _, batch in enumerate(tqdm(dev_query_dataloader, desc="dev")):
+            input_ids, input_mask, _, label_ids = batch
+            input_ids = input_ids.to(device)
+            input_mask = input_mask.to(device)
+            # segment_ids = segment_ids.to(device)
+            label_ids = label_ids.to(device)
+            gold_label_ids_raw+=list(label_ids.detach().cpu().numpy())
+
+
+            with torch.no_grad():
+                last_hidden_batch, _ = model(input_ids, input_mask)
+            query_normalized_rep = last_hidden_batch/(1e-8+torch.sqrt(torch.sum(torch.square(last_hidden_batch), axis=1, keepdim=True)))
+            logits = torch.mm(query_normalized_rep, torch.transpose(support_normalized_rep, 0, 1)) #(batch, class)
+            if len(preds) == 0:
+                preds.append(logits.detach().cpu().numpy())
+            else:
+                preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
+        preds = preds[0]
+
+        pred_probs = softmax(preds,axis=1)
+        pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
+        pred_max_prob = list(np.amax(pred_probs, axis=1))
+
+        best_threshold = -0.1
+        best_acc_by_threshold = 0.0
+        gold_label_ids = []
+        for gold_label_id in gold_label_ids_raw:
+            if gold_label_id >= len(seen_class_list):
+                gold_label_ids.append(-1)
+            else:
+                gold_label_ids.append(gold_label_id)
+        for threshold in np.arange(0.99, 0.0, -0.01):
+            pred_label_ids = []
+            for i, pred_max_prob_i in enumerate(pred_max_prob):
+                if pred_max_prob_i < threshold:
+                    pred_label_ids.append(-1) #-1 means ood
+                else:
+                    pred_label_ids.append(pred_label_ids_raw[i])
+
+            assert len(pred_label_ids) == len(gold_label_ids)
+            acc_each_round = []
+            for round_name_id in round_list:
+                #base, n1, n2, ood
+                round_size = 0
+                rount_hit = 0
+                if round_name_id != 'ood':
+                    for ii, gold_label_id in enumerate(gold_label_ids):
+                        if test_split_list[gold_label_id] == round_name_id:
+                            round_size+=1
+                            if gold_label_id == pred_label_ids[ii]:
+                                rount_hit+=1
+                    acc_i = rount_hit/round_size
+                    acc_each_round.append(acc_i)
+                else:
+                    '''ood acc'''
+                    for ii, gold_label_id in enumerate(gold_label_ids):
+                        if test_split_list[gold_label_id] == round_name_id:
+                            round_size+=1
+                            if pred_label_ids[ii]==-1:
+                                rount_hit+=1
+                    acc_i = rount_hit/round_size
+                    acc_each_round.append(acc_i)
+            dev_mean_acc = np.mean(acc_each_round)
+            if dev_mean_acc > best_acc_by_threshold:
+                best_acc_by_threshold = dev_mean_acc
+                best_threshold = threshold
+                best_acc_by_list = acc_each_round
+
+        dev_acc = best_acc_by_threshold
+        if dev_acc > max_dev_acc:
+            max_dev_acc = dev_acc
+            print('\ndev acc:', best_acc_by_list, 'threshold:', best_threshold,' max_dev_acc:', max_dev_acc, '\n')
+
+
+            logger.info("***** Running test *****")
+            logger.info("  Num examples = %d", len(test_examples))
+
+            preds = []
+            gold_label_ids = []
+            # print('Evaluating...')
+            for input_ids, input_mask, segment_ids, label_ids in test_query_dataloader:
+                input_ids = input_ids.to(device)
+                input_mask = input_mask.to(device)
+                # segment_ids = segment_ids.to(device)
+                label_ids = label_ids.to(device)
+                gold_label_ids+=list(label_ids.detach().cpu().numpy())
+
+                # with torch.no_grad():
+                #     logits = model(input_ids, input_mask)
+                with torch.no_grad():
+                    last_hidden_batch, _ = model(input_ids, input_mask)
+                query_normalized_rep = last_hidden_batch/(1e-8+torch.sqrt(torch.sum(torch.square(last_hidden_batch), axis=1, keepdim=True)))
+                logits = torch.mm(query_normalized_rep, torch.transpose(support_normalized_rep, 0, 1)) #(batch, class)
+                if len(preds) == 0:
+                    preds.append(logits.detach().cpu().numpy())
+                else:
+                    preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
+
+            preds = preds[0]
+
+            pred_probs = softmax(preds,axis=1)
+            pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
+            pred_max_prob = list(np.amax(pred_probs, axis=1))
+
+            pred_label_ids = []
+            for i, pred_max_prob_i in enumerate(pred_max_prob):
+                if pred_max_prob_i < best_threshold:
+                    pred_label_ids.append(-1) #-1 means ood
+                else:
+                    pred_label_ids.append(pred_label_ids_raw[i])
+
+
+            gold_label_ids = gold_label_ids
+            assert len(pred_label_ids) == len(gold_label_ids)
+            acc_each_round = []
+            for round_name_id in round_list:
+                #base, n1, n2, ood
+                round_size = 0
+                rount_hit = 0
+                if round_name_id != 'ood':
+                    for ii, gold_label_id in enumerate(gold_label_ids):
+                        if test_split_list[gold_label_id] == round_name_id:
+                            round_size+=1
+                            if gold_label_id == pred_label_ids[ii]:
+                                rount_hit+=1
+                    acc_i = rount_hit/round_size
+                    acc_each_round.append(acc_i)
+                else:
+                    '''ood acc'''
+                    for ii, gold_label_id in enumerate(gold_label_ids):
+                        if test_split_list[gold_label_id] == round_name_id:
+                            round_size+=1
+                            if pred_label_ids[ii]==-1:
+                                rount_hit+=1
+                    acc_i = rount_hit/round_size
+                    acc_each_round.append(acc_i)
+
+            print('\n\t\t test_acc:', acc_each_round)
+            final_test_performance = acc_each_round
+        else:
+            print('\ndev acc:', best_acc_by_list, 'threshold:', best_threshold,' max_dev_acc:', max_dev_acc, '\n')
+
+    print('final_test_performance:', final_test_performance)
 
 if __name__ == "__main__":
     main()
