@@ -730,7 +730,7 @@ def main():
                 preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
         preds = preds[0]
 
-        pred_probs = softmax(preds,axis=1)
+        pred_probs = preds#softmax(preds,axis=1)
         pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
         pred_max_prob = list(np.amax(pred_probs, axis=1))
 
@@ -811,7 +811,7 @@ def main():
 
             preds = preds[0]
 
-            pred_probs = softmax(preds,axis=1)
+            pred_probs = preds#softmax(preds,axis=1)
             pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
             pred_max_prob = list(np.amax(pred_probs, axis=1))
 
