@@ -615,7 +615,7 @@ def main():
 
     round_list = round_name_2_rounds.get(args.round_name)
     '''support for all seen classes'''
-    class_2_support_examples = load_support_all_rounds(self, round_list[:-1]) #no support set for ood
+    class_2_support_examples = processor.load_support_all_rounds(self, round_list[:-1]) #no support set for ood
     seen_class_list = list(class_2_support_examples.keys())
     support_example_lists = [class_2_support_examples.get(seen_class)  for seen_class in seen_class_list]
     '''dev and test'''
@@ -654,7 +654,7 @@ def main():
 
         print('class rep build over')
         '''then compute rep for query batch'''
-        for batch in train_query_dataloader:
+        for _, batch in enumerate(tqdm(train_query_dataloader, desc="train")):
             model.train()
             batch = tuple(t.to(device) for t in batch)
             input_ids, input_mask, _, label_ids = batch
@@ -662,7 +662,6 @@ def main():
             last_hidden_batch, _ = model(input_ids, input_mask) #(batch, hidden)
             query_normalized_rep = last_hidden_batch/(1e-8+torch.sqrt(torch.sum(torch.square(last_hidden_batch), axis=1, keepdim=True)))
             '''first compute class prototype rep'''
-
             all_class_proto_reps = []
             for train_support_dataloader in train_support_dataloader_list:
                 class_reps = torch.zeros(1, bert_hidden_dim).to(device)
@@ -685,7 +684,6 @@ def main():
             loss_fct = CrossEntropyLoss()
 
             loss = loss_fct(logits.view(-1, 10), label_ids.view(-1))
-            print('loss:', loss)
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
