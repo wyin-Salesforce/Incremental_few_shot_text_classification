@@ -592,7 +592,7 @@ def main():
 
 
         '''first compute class prototype rep'''
-        model.train()
+
         all_class_proto_reps = []
         for train_support_dataloader in train_support_dataloader_list:
             class_reps = torch.zeros(1, bert_hidden_dim).to(device)
@@ -610,6 +610,7 @@ def main():
         print('class rep build over')
         '''then compute rep for query batch'''
         for batch in train_query_dataloader:
+            model.train()
             batch = tuple(t.to(device) for t in batch)
             input_ids, input_mask, _, label_ids = batch
 
@@ -623,7 +624,7 @@ def main():
             loss_fct = CrossEntropyLoss()
 
             loss = loss_fct(logits.view(-1, 10), label_ids.view(-1))
-            print('loss')
+            print('loss:', loss)
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -891,7 +892,7 @@ if __name__ == "__main__":
 
 '''
 
-CUDA_VISIBLE_DEVICES=7 python -u train.protonet.baseline.py --task_name rte --do_train --do_lower_case --num_train_epochs 20 --train_batch_size 20 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 128 --seed 42 --round_name 'r1'
+CUDA_VISIBLE_DEVICES=7 python -u train.protonet.baseline.py --task_name rte --do_train --do_lower_case --num_train_epochs 20 --train_batch_size 20 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 64 --seed 42 --round_name 'r1'
 
 
 '''
