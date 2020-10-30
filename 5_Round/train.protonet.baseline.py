@@ -621,7 +621,7 @@ def main():
     '''dev and test'''
     dev_examples, dev_class_list = processor.load_dev_or_test(round_list, 'dev')
     test_examples, test_class_list = processor.load_dev_or_test(round_list, 'test')
-    assert len(set(dev_class_list) | set(test_class_list)) = len(set(dev_class_list))
+    assert len(set(dev_class_list) | set(test_class_list)) == len(set(dev_class_list))
     assert len(test_class_list) == len(seen_class_list)+7
     eval_class_list = seen_class_list+list(ood_class_set)
 
