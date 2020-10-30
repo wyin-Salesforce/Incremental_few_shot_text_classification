@@ -641,7 +641,7 @@ def main():
     '''training'''
     max_test_acc = 0.0
     max_dev_acc = 0.0
-    for _ in range(20):
+    for _ in range(args.num_train_epochs):
         train_support_examples_list, full_query_examples, selected_class_list = processor.load_base_train() #we do not use ood as training
         train_support_dataloader_list = []
 
@@ -860,7 +860,7 @@ if __name__ == "__main__":
 
 '''
 
-CUDA_VISIBLE_DEVICES=7 python -u train.protonet.baseline.py --task_name rte --do_train --do_lower_case --num_train_epochs 20 --train_batch_size 20 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 64 --seed 42 --round_name 'r1'
+CUDA_VISIBLE_DEVICES=7 python -u train.protonet.baseline.py --task_name rte --do_train --do_lower_case --num_train_epochs 50 --train_batch_size 10 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 64 --seed 42 --round_name 'r1'
 
 
 '''
