@@ -41,7 +41,7 @@ def extract(flag):
     assert len(result_lists[0]) == len(result_lists[2])
     final_results = []
     for i in range(len(result_lists[0])):
-        final_results.append(compute([result_lists[0][i], result_lists[1][i], result_lists[2][i]]))
+        final_results.append(compute([result_lists[0][i]*100.0, result_lists[1][i]*100.0, result_lists[2][i]]*100.0))
     print('final_results:', final_results)
 
 if __name__ == "__main__":
