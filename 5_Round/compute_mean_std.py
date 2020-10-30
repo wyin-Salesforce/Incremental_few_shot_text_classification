@@ -19,7 +19,7 @@ def compute(test_list):
     average = round(sum(test_list)/len(test_list), 2)
     res = round(statistics.pstdev(test_list),2)
 
-    return str(average)+'$\pm$'+str(res)
+    return str(average)+'$\\pm$'+str(res)
 
 def extract(flag):
     filenames = ['log.prototype.'+flag+'.seed.42.txt',
