@@ -615,7 +615,7 @@ def main():
 
     round_list = round_name_2_rounds.get(args.round_name)
     '''support for all seen classes'''
-    class_2_support_examples = processor.load_support_all_rounds(self, round_list[:-1]) #no support set for ood
+    class_2_support_examples = processor.load_support_all_rounds(round_list[:-1]) #no support set for ood
     seen_class_list = list(class_2_support_examples.keys())
     support_example_lists = [class_2_support_examples.get(seen_class)  for seen_class in seen_class_list]
     '''dev and test'''
