@@ -22,9 +22,9 @@ def compute(test_list):
     return str(average)+'/'+str(res)
 
 def extract(flag):
-    filenames = ['log.supervised.'+flag+'.seed.42.debug.txt',
-                 'log.supervised.'+flag+'.seed.16.debug.txt',
-                 'log.supervised.'+flag+'.seed.32.debug.txt']
+    filenames = ['log.prototype.'+flag+'.seed.42.txt',
+                 'log.prototype.'+flag+'.seed.16.txt',
+                 'log.prototype.'+flag+'.seed.32.txt']
     result_lists = []
     for fil in filenames:
         readfile = codecs.open('/export/home/workspace/Incremental_few_shot_text_classification/5_Round/'+fil, 'r', 'utf-8')
