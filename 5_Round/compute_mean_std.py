@@ -19,7 +19,7 @@ def compute(test_list):
     average = round(sum(test_list)/len(test_list), 2)
     res = round(statistics.pstdev(test_list),2)
     # print(str(average)+'$'+"\\"+'pm$'+str(res))
-    return str(average)+'$'+"\\"+'pm$'+str(res)
+    return str(average)+'$\\pm$'+str(res)
 
 def extract(flag):
     filenames = ['log.prototype.'+flag+'.seed.42.txt',
@@ -42,9 +42,7 @@ def extract(flag):
     final_results = []
     for i in range(len(result_lists[0])):
         strr = compute([result_lists[0][i]*100.0, result_lists[1][i]*100.0, result_lists[2][i]*100.0])
-        print('strr:', strr)
         final_results.append(strr)
-        print('final_results:', final_results)
     print('final_results:', final_results)
 
 if __name__ == "__main__":
