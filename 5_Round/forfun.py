@@ -1,5 +1,5 @@
 from collections import defaultdict
-
+import codecs
 def statistics():
     filenames = ['total_train.txt', 'total_dev.txt', 'total_test.txt']
     len2count = defaultdict()
