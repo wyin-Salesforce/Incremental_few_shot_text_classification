@@ -591,22 +591,7 @@ def main():
         train_query_dataloader = examples_to_features(full_query_examples, selected_class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='random')
 
 
-        '''first compute class prototype rep'''
 
-        all_class_proto_reps = []
-        for train_support_dataloader in train_support_dataloader_list:
-            class_reps = torch.zeros(1, bert_hidden_dim).to(device)
-            batch_size_accu = 0
-            for batch in train_support_dataloader:
-                batch = tuple(t.to(device) for t in batch)
-                input_ids, input_mask, _, _ = batch
-
-                last_hidden_batch, _ = model(input_ids, input_mask)
-                class_reps+=torch.mean(last_hidden_batch, axis=0, keepdim=True)
-                batch_size_accu+=1
-            class_rep = class_reps/batch_size_accu
-            all_class_proto_reps.append(class_rep)
-        all_class_proto_reps = torch.cat(all_class_proto_reps, axis=0) #(#class, hidden)
         print('class rep build over')
         '''then compute rep for query batch'''
         for batch in train_query_dataloader:
@@ -615,6 +600,22 @@ def main():
             input_ids, input_mask, _, label_ids = batch
 
             last_hidden_batch, _ = model(input_ids, input_mask) #(batch, hidden)
+            '''first compute class prototype rep'''
+
+            all_class_proto_reps = []
+            for train_support_dataloader in train_support_dataloader_list:
+                class_reps = torch.zeros(1, bert_hidden_dim).to(device)
+                batch_size_accu = 0
+                for batch in train_support_dataloader:
+                    batch = tuple(t.to(device) for t in batch)
+                    input_ids, input_mask, _, _ = batch
+
+                    last_hidden_batch, _ = model(input_ids, input_mask)
+                    class_reps+=torch.mean(last_hidden_batch, axis=0, keepdim=True)
+                    batch_size_accu+=1
+                class_rep = class_reps/batch_size_accu
+                all_class_proto_reps.append(class_rep)
+            all_class_proto_reps = torch.cat(all_class_proto_reps, axis=0) #(#class, hidden)
             #cosine
             query_normalized_rep = last_hidden_batch/(1e-8+torch.sqrt(torch.sum(torch.square(last_hidden_batch), axis=1, keepdim=True)))
             support_normalized_rep = all_class_proto_reps/(1e-8+torch.sqrt(torch.sum(torch.square(all_class_proto_reps), axis=1, keepdim=True)))
