@@ -620,10 +620,8 @@ def main():
             support_normalized_rep = all_class_proto_reps/(1e-8+torch.sqrt(torch.sum(torch.square(all_class_proto_reps), axis=1, keepdim=True)))
             #cosine
 
-            cosine_matrix = torch.mm(query_normalized_rep, torch.transpose(support_normalized_rep, 0, 1)) #(batch, class)
+            logits = torch.mm(query_normalized_rep, torch.transpose(support_normalized_rep, 0, 1)) #(batch, class)
 
-            logits = cosine_matrix
-            # print('logits shape:', logits.shape)
             loss_fct = CrossEntropyLoss()
 
             loss = loss_fct(logits.view(-1, 10), label_ids.view(-1))
