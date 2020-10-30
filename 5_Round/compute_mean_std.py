@@ -31,7 +31,7 @@ def extract(flag):
         readfile = codecs.open('/export/home/workspace/Incremental_few_shot_text_classification/5_Round/'+fil, 'r', 'utf-8')
         for line in readfile:
             line_str  = line.strip()
-            if line_str.startwith('final_test_performance'):
+            if line_str.startswith('final_test_performance'):
                 position = line_str.find(':')
                 target_list = json.loads(line_str[position:].strip())
                 print('target_list:', target_list)
