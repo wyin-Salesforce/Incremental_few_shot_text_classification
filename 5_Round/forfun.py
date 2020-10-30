@@ -1,8 +1,8 @@
-from collections import defaultdict
+from collections import Counter
 import codecs
 def statistics():
     filenames = ['total_train.txt', 'total_dev.txt', 'total_test.txt']
-    len2count = defaultdict()
+    len2count = Counter()
     for fil in filenames:
         readfile = codecs.open('/export/home/Dataset/incrementalFewShotTextClassification/Incremental-few-shot-text-classification-master/dataset/banking77/split/'+fil, 'r', 'utf-8')
         for line in readfile:
