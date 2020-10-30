@@ -9,6 +9,7 @@ def statistics():
             sent = line.split('\t')[1].strip().split()
             lens = len(sent)
             len2count[lens]+=1
+    print('len2count:', len2count)
     print(sorted(len2count))
 
 
