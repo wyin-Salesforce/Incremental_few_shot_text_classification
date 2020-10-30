@@ -600,6 +600,7 @@ def main():
             input_ids, input_mask, _, label_ids = batch
 
             last_hidden_batch, _ = model(input_ids, input_mask) #(batch, hidden)
+            query_normalized_rep = last_hidden_batch/(1e-8+torch.sqrt(torch.sum(torch.square(last_hidden_batch), axis=1, keepdim=True)))
             '''first compute class prototype rep'''
 
             all_class_proto_reps = []
@@ -616,13 +617,13 @@ def main():
                 class_rep = class_reps/batch_size_accu
                 all_class_proto_reps.append(class_rep)
             all_class_proto_reps = torch.cat(all_class_proto_reps, axis=0) #(#class, hidden)
-            #cosine
-            query_normalized_rep = last_hidden_batch/(1e-8+torch.sqrt(torch.sum(torch.square(last_hidden_batch), axis=1, keepdim=True)))
             support_normalized_rep = all_class_proto_reps/(1e-8+torch.sqrt(torch.sum(torch.square(all_class_proto_reps), axis=1, keepdim=True)))
+            #cosine
+
             cosine_matrix = torch.mm(query_normalized_rep, torch.transpose(support_normalized_rep, 0, 1)) #(batch, class)
 
             logits = cosine_matrix
-            print('logits shape:', logits.shape)
+            # print('logits shape:', logits.shape)
             loss_fct = CrossEntropyLoss()
 
             loss = loss_fct(logits.view(-1, 10), label_ids.view(-1))
