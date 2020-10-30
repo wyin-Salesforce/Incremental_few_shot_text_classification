@@ -1,7 +1,6 @@
 import statistics
 import codecs
-
-import json
+import ast
 
 
 # initializing list
@@ -33,7 +32,7 @@ def extract(flag):
             line_str  = line.strip()
             if line_str.startswith('final_test_performance'):
                 position = line_str.find(':')
-                target_list = json.loads(line_str[position:].strip())
+                target_list = ast.literal_eval(line_str[position:].strip())
                 print('target_list:', target_list)
                 result_lists.append(target_list)
                 break
