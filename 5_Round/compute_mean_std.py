@@ -44,6 +44,7 @@ def extract(flag):
         strr = compute([result_lists[0][i]*100.0, result_lists[1][i]*100.0, result_lists[2][i]*100.0])
         print('strr:', strr)
         final_results.append(strr)
+        print('final_results:', final_results)
     print('final_results:', final_results)
 
 if __name__ == "__main__":
