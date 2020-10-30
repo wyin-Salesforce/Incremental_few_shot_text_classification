@@ -33,7 +33,7 @@ def extract(flag):
             if line_str.startswith('final_test_performance'):
                 position = line_str.find(':')
                 target_list = ast.literal_eval(line_str[position+1:].strip())
-                print('target_list:', target_list)
+                # print('target_list:', target_list)
                 result_lists.append(target_list)
                 break
         readfile.close()
@@ -46,3 +46,8 @@ def extract(flag):
 
 if __name__ == "__main__":
     extract('base')
+    extract('r1')
+    extract('r2')
+    extract('r3')
+    extract('r4')
+    extract('r5')
