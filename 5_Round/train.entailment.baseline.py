@@ -176,7 +176,7 @@ class RteProcessor(DataProcessor):
                 class_set_in_this_round.add(class_name)
             readfile.close()
             class_list_up_to_now += list(class_set_in_this_round)
-            round_indicator_up_to_now+=[round]*list(class_set_in_this_round)
+            round_indicator_up_to_now+=[round]*len(class_set_in_this_round)
             '''transform each example into entailment pair'''
             filename = '/export/home/Dataset/incrementalFewShotTextClassification/Incremental-few-shot-text-classification-master/dataset/banking77/split/'+round+'/train.txt'
             readfile = codecs.open(filename, 'r', 'utf-8')
