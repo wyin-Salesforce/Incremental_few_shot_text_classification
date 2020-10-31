@@ -174,7 +174,7 @@ class RteProcessor(DataProcessor):
                 assert len(parts)==2
                 class_name = parts[0].strip()
                 class_set_in_this_round.add(class_name)
-            readfile.clsoe()
+            readfile.close()
             class_list_up_to_now += list(class_set_in_this_round)
             round_indicator_up_to_now+=[round]*list(class_set_in_this_round)
             '''transform each example into entailment pair'''
