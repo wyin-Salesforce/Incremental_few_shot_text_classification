@@ -639,17 +639,93 @@ def main():
     model.eval()
     '''dev'''
     acc_each_round = []
-    for dev_id, dev_dataloader in enumerate(dev_dataloader_list):
+    preds = []
+    gold_class_ids = []
+    for _, batch in enumerate(tqdm(dev_dataloader, desc="dev")):
+        input_ids, input_mask, _, label_ids, premise_class_ids = batch
+        input_ids = input_ids.to(device)
+        input_mask = input_mask.to(device)
+
+        gold_class_ids+=list(premise_class_ids.detach().cpu().numpy())
+
+
+        with torch.no_grad():
+            logits = model(input_ids, input_mask)
+        if len(preds) == 0:
+            preds.append(logits.detach().cpu().numpy())
+        else:
+            preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
+    preds = preds[0]
+
+    pred_probs = list(softmax(preds,axis=1)[:,0]) #prob for "entailment" class: (#input, #seen_classe)
+    assert len(pred_probs) == len(dev_examples)*len(train_class_set)
+    assert len(gold_class_ids) == len(dev_examples)
+
+    pred_probs = np.array(pred_probs).reshape(len(dev_examples),len(train_class_set))
+    pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
+    pred_max_prob = list(np.amax(pred_probs, axis=1))
+
+
+    best_threshold = -0.1
+    best_acc_by_threshold = 0.0
+    gold_label_ids = gold_class_ids
+
+    for threshold in np.arange(0.99, 0.0, -0.01):
+        pred_label_ids = []
+        for i, pred_max_prob_i in enumerate(pred_max_prob):
+            if pred_max_prob_i < threshold:
+                pred_label_ids.append(len(train_class_set)) #len(train_class_set) equals to ood index
+            else:
+                pred_label_ids.append(pred_label_ids_raw[i])
+
+        assert len(pred_label_ids) == len(gold_label_ids)
+        acc_each_round = []
+        for round_name_id in round_list:
+            #base, n1, n2, ood
+            round_size = 0
+            rount_hit = 0
+            if round_name_id != 'ood':
+                for ii, gold_label_id in enumerate(gold_label_ids):
+                    if test_split_list[gold_label_id] == round_name_id:
+                        round_size+=1
+                        if gold_label_id == pred_label_ids[ii]:
+                            rount_hit+=1
+                acc_i = rount_hit/round_size
+                acc_each_round.append(acc_i)
+            else:
+                '''ood acc'''
+                for ii, gold_label_id in enumerate(gold_label_ids):
+                    if test_split_list[gold_label_id] == round_name_id:
+                        round_size+=1
+                        if pred_label_ids[ii]==-1:
+                            rount_hit+=1
+                acc_i = rount_hit/round_size
+                acc_each_round.append(acc_i)
+        dev_mean_acc = np.mean(acc_each_round)
+        if dev_mean_acc > best_acc_by_threshold:
+            best_acc_by_threshold = dev_mean_acc
+            best_threshold = threshold
+            best_acc_by_list = acc_each_round
+
+
+
+    dev_acc = best_acc_by_threshold
+    if dev_acc > max_dev_acc:
+        max_dev_acc = dev_acc
+        print('\ndev acc:', best_acc_by_list, 'threshold:', best_threshold,' max_dev_acc:', max_dev_acc, '\n')
+
+
+        logger.info("***** Running test *****")
+        logger.info("  Num examples = %d", len(test_examples))
 
         preds = []
-        gold_class_ids = []
-        for _, batch in enumerate(tqdm(dev_dataloader, desc="dev")):
-            input_ids, input_mask, _, label_ids, premise_class_ids = batch
+        gold_label_ids = []
+        for input_ids, input_mask, segment_ids, label_ids, premise_class_ids in test_dataloader:
             input_ids = input_ids.to(device)
             input_mask = input_mask.to(device)
-
-            gold_class_ids+=list(premise_class_ids.detach().cpu().numpy())
-
+            # segment_ids = segment_ids.to(device)
+            # label_ids = label_ids.to(device)
+            gold_label_ids+=list(premise_class_ids.detach().cpu().numpy())
 
             with torch.no_grad():
                 logits = model(input_ids, input_mask)
@@ -657,132 +733,54 @@ def main():
                 preds.append(logits.detach().cpu().numpy())
             else:
                 preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
+
         preds = preds[0]
 
         pred_probs = list(softmax(preds,axis=1)[:,0]) #prob for "entailment" class: (#input, #seen_classe)
-        assert len(pred_probs) == len(dev_examples)*len(train_class_set)
-        assert len(gold_class_ids) == len(dev_examples)
+        assert len(pred_probs) == len(test_examples)*len(train_class_set)
+        assert len(gold_class_ids) == len(test_examples)
 
-        pred_probs = np.array(pred_probs).reshape(len(dev_examples),len(train_class_set))
+        pred_probs = np.array(pred_probs).reshape(len(test_examples),len(train_class_set))
         pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
         pred_max_prob = list(np.amax(pred_probs, axis=1))
 
+        pred_label_ids = []
+        for i, pred_max_prob_i in enumerate(pred_max_prob):
+            if pred_max_prob_i < best_threshold:
+                pred_label_ids.append(len(train_class_set)) #-1 means ood
+            else:
+                pred_label_ids.append(pred_label_ids_raw[i])
 
-        best_threshold = -0.1
-        best_acc_by_threshold = 0.0
-        gold_label_ids = gold_class_ids
+        assert len(pred_label_ids) == len(gold_label_ids)
+        acc_each_round = []
+        for round_name_id in round_list:
+            #base, n1, n2, ood
+            round_size = 0
+            rount_hit = 0
+            if round_name_id != 'ood':
+                for ii, gold_label_id in enumerate(gold_label_ids):
+                    if test_split_list[gold_label_id] == round_name_id:
+                        round_size+=1
+                        if gold_label_id == pred_label_ids[ii]:
+                            rount_hit+=1
+                acc_i = rount_hit/round_size
+                acc_each_round.append(acc_i)
+            else:
+                '''ood acc'''
+                for ii, gold_label_id in enumerate(gold_label_ids):
+                    if test_split_list[gold_label_id] == round_name_id:
+                        round_size+=1
+                        if pred_label_ids[ii]==-1:
+                            rount_hit+=1
+                acc_i = rount_hit/round_size
+                acc_each_round.append(acc_i)
 
-        for threshold in np.arange(0.99, 0.0, -0.01):
-            pred_label_ids = []
-            for i, pred_max_prob_i in enumerate(pred_max_prob):
-                if pred_max_prob_i < threshold:
-                    pred_label_ids.append(len(train_class_set)) #len(train_class_set) equals to ood index
-                else:
-                    pred_label_ids.append(pred_label_ids_raw[i])
+        print('\n\t\t test_acc:', acc_each_round)
+        final_test_performance = acc_each_round
+    else:
+        print('\ndev acc:', best_acc_by_list, 'threshold:', best_threshold,' max_dev_acc:', max_dev_acc, '\n')
 
-            assert len(pred_label_ids) == len(gold_label_ids)
-            acc_each_round = []
-            for round_name_id in round_list:
-                #base, n1, n2, ood
-                round_size = 0
-                rount_hit = 0
-                if round_name_id != 'ood':
-                    for ii, gold_label_id in enumerate(gold_label_ids):
-                        if test_split_list[gold_label_id] == round_name_id:
-                            round_size+=1
-                            if gold_label_id == pred_label_ids[ii]:
-                                rount_hit+=1
-                    acc_i = rount_hit/round_size
-                    acc_each_round.append(acc_i)
-                else:
-                    '''ood acc'''
-                    for ii, gold_label_id in enumerate(gold_label_ids):
-                        if test_split_list[gold_label_id] == round_name_id:
-                            round_size+=1
-                            if pred_label_ids[ii]==-1:
-                                rount_hit+=1
-                    acc_i = rount_hit/round_size
-                    acc_each_round.append(acc_i)
-            dev_mean_acc = np.mean(acc_each_round)
-            if dev_mean_acc > best_acc_by_threshold:
-                best_acc_by_threshold = dev_mean_acc
-                best_threshold = threshold
-                best_acc_by_list = acc_each_round
-
-
-
-        dev_acc = best_acc_by_threshold
-        if dev_acc > max_dev_acc:
-            max_dev_acc = dev_acc
-            print('\ndev acc:', best_acc_by_list, 'threshold:', best_threshold,' max_dev_acc:', max_dev_acc, '\n')
-
-
-            logger.info("***** Running test *****")
-            logger.info("  Num examples = %d", len(test_examples))
-
-            preds = []
-            gold_label_ids = []
-            for input_ids, input_mask, segment_ids, label_ids, premise_class_ids in test_dataloader:
-                input_ids = input_ids.to(device)
-                input_mask = input_mask.to(device)
-                # segment_ids = segment_ids.to(device)
-                # label_ids = label_ids.to(device)
-                gold_label_ids+=list(premise_class_ids.detach().cpu().numpy())
-
-                with torch.no_grad():
-                    logits = model(input_ids, input_mask)
-                if len(preds) == 0:
-                    preds.append(logits.detach().cpu().numpy())
-                else:
-                    preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
-
-            preds = preds[0]
-
-            pred_probs = list(softmax(preds,axis=1)[:,0]) #prob for "entailment" class: (#input, #seen_classe)
-            assert len(pred_probs) == len(test_examples)*len(train_class_set)
-            assert len(gold_class_ids) == len(test_examples)
-
-            pred_probs = np.array(pred_probs).reshape(len(test_examples),len(train_class_set))
-            pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
-            pred_max_prob = list(np.amax(pred_probs, axis=1))
-
-            pred_label_ids = []
-            for i, pred_max_prob_i in enumerate(pred_max_prob):
-                if pred_max_prob_i < best_threshold:
-                    pred_label_ids.append(len(train_class_set)) #-1 means ood
-                else:
-                    pred_label_ids.append(pred_label_ids_raw[i])
-
-            assert len(pred_label_ids) == len(gold_label_ids)
-            acc_each_round = []
-            for round_name_id in round_list:
-                #base, n1, n2, ood
-                round_size = 0
-                rount_hit = 0
-                if round_name_id != 'ood':
-                    for ii, gold_label_id in enumerate(gold_label_ids):
-                        if test_split_list[gold_label_id] == round_name_id:
-                            round_size+=1
-                            if gold_label_id == pred_label_ids[ii]:
-                                rount_hit+=1
-                    acc_i = rount_hit/round_size
-                    acc_each_round.append(acc_i)
-                else:
-                    '''ood acc'''
-                    for ii, gold_label_id in enumerate(gold_label_ids):
-                        if test_split_list[gold_label_id] == round_name_id:
-                            round_size+=1
-                            if pred_label_ids[ii]==-1:
-                                rount_hit+=1
-                    acc_i = rount_hit/round_size
-                    acc_each_round.append(acc_i)
-
-            print('\n\t\t test_acc:', acc_each_round)
-            final_test_performance = acc_each_round
-        else:
-            print('\ndev acc:', best_acc_by_list, 'threshold:', best_threshold,' max_dev_acc:', max_dev_acc, '\n')
-
-        print('final_test_performance:', final_test_performance)
+    print('final_test_performance:', final_test_performance)
 
 if __name__ == "__main__":
     main()
