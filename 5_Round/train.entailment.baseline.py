@@ -600,9 +600,11 @@ def main():
     '''load training in list'''
     train_examples_list, train_class_list, train_class_2_split_list = processor.load_train(round_list[:-1]) # no odd training examples
     assert len(train_class_list) == len(train_class_2_split_list)
+    assert len(train_class_list) ==  20+(len(round_list)-1)*10
     '''dev and test'''
     dev_examples = processor.load_dev_or_test(round_list, train_class_list, 'dev')
     test_examples = processor.load_dev_or_test(round_list, train_class_list, 'test')
+    print('train size:', [len(train_i) for train_i in train_examples_list], ' dev size:', len(dev_examples), ' test size:', len(test_examples))
     entail_class_list = ['entailment', 'non-entailment']
     eval_class_list = train_class_list+['ood']
     test_split_list = train_class_2_split_list+['ood']
@@ -620,7 +622,7 @@ def main():
         '''for the new examples in each round, train multiple epochs'''
         train_dataloader = train_dataloader_list[round_index]
         for _ in range(args.num_train_epochs):
-            for _, batch in enumerate(tqdm(train_dataloader, desc="train")):
+            for _, batch in enumerate(tqdm(train_dataloader, desc="train|"+round)):
                 model.train()
                 batch = tuple(t.to(device) for t in batch)
                 input_ids, input_mask, _, label_ids, premise_class_ids = batch
