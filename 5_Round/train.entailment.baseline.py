@@ -665,6 +665,7 @@ def main():
 
 
     pred_label_3way = np.array(pred_label_3way).reshape(len(dev_examples)//len(train_class_list),len(train_class_list))
+    print('pred_label_3way:', pred_label_3way)
     pred_probs = np.array(pred_probs).reshape(len(dev_examples)//len(train_class_list),len(train_class_list))
     gold_class_ids = np.array(gold_class_ids).reshape(len(dev_examples)//len(train_class_list),len(train_class_list))
     '''verify gold_class_ids per row'''
@@ -675,9 +676,9 @@ def main():
     pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
     pred_max_prob = list(np.amax(pred_probs, axis=1))
     pred_label_ids = []
-    for idd, value in enumerate(pred_label_ids_raw):
-        if pred_label_3way[idd][value]==0:
-            pred_label_ids.append(value)
+    for idd, seen_class_id in enumerate(pred_label_ids_raw):
+        if pred_label_3way[idd][seen_class_id]==0:
+            pred_label_ids.append(seen_class_id)
         else:
             pred_label_ids.append(len(train_class_list))
 
@@ -748,9 +749,9 @@ def main():
         pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
         pred_max_prob = list(np.amax(pred_probs, axis=1))
         pred_label_ids = []
-        for idd, value in enumerate(pred_label_ids_raw):
-            if pred_label_3way[idd][value]==0:
-                pred_label_ids.append(value)
+        for idd, seen_class_id in enumerate(pred_label_ids_raw):
+            if pred_label_3way[idd][seen_class_id]==0:
+                pred_label_ids.append(seen_class_id)
             else:
                 pred_label_ids.append(len(train_class_list))
 
