@@ -270,7 +270,7 @@ def convert_examples_to_features(examples, label_list, eval_class_list, max_seq_
     """
 
     label_map = {label : i for i, label in enumerate(label_list)}
-    class_map = {class : i for i, class in enumerate(eval_class_list)}
+    class_map = {label : i for i, label in enumerate(eval_class_list)}
 
     features = []
     for (ex_index, example) in enumerate(examples):
