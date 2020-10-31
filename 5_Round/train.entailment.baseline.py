@@ -161,7 +161,7 @@ class RteProcessor(DataProcessor):
 
     def load_train(self, round_list):
         examples_list = []
-        class_list_up_to_now = list
+        class_list_up_to_now = []
         round_indicator_up_to_now = []
         for round in round_list:
             '''first collect the class set in this round'''
