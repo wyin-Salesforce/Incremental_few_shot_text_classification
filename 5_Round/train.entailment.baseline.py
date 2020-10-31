@@ -665,7 +665,7 @@ def main():
 
 
     pred_label_3way = np.array(pred_label_3way).reshape(len(dev_examples)//len(train_class_list),len(train_class_list))
-    print('pred_label_3way:', pred_label_3way[pred_label_3way.shape[0]-5:, :])
+    # print('pred_label_3way:', pred_label_3way[pred_label_3way.shape[0]-5:, :])
     pred_probs = np.array(pred_probs).reshape(len(dev_examples)//len(train_class_list),len(train_class_list))
     gold_class_ids = np.array(gold_class_ids).reshape(len(dev_examples)//len(train_class_list),len(train_class_list))
     '''verify gold_class_ids per row'''
@@ -682,8 +682,8 @@ def main():
         else:
             pred_label_ids.append(len(train_class_list))
 
-    print('pred_label_ids:', pred_label_ids)
-    print('gold_label_ids:', gold_label_ids)
+    # print('pred_label_ids:', pred_label_ids)
+    # print('gold_label_ids:', gold_label_ids)
     assert len(pred_label_ids) == len(gold_label_ids)
     acc_each_round = []
     for round_name_id in round_list:
@@ -703,7 +703,7 @@ def main():
             for ii, gold_label_id in enumerate(gold_label_ids):
                 if test_split_list[gold_label_id] == round_name_id:
                     round_size+=1
-                    if pred_label_ids[ii]==-1:
+                    if pred_label_ids[ii]==len(train_class_list):
                         rount_hit+=1
             acc_i = rount_hit/round_size
             acc_each_round.append(acc_i)
@@ -776,7 +776,7 @@ def main():
                 for ii, gold_label_id in enumerate(gold_label_ids):
                     if test_split_list[gold_label_id] == round_name_id:
                         round_size+=1
-                        if pred_label_ids[ii]==-1:
+                        if pred_label_ids[ii]==len(train_class_list):
                             rount_hit+=1
                 acc_i = rount_hit/round_size
                 acc_each_round.append(acc_i)
