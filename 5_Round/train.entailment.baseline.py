@@ -658,10 +658,10 @@ def main():
     preds = preds[0]
 
     pred_probs = list(softmax(preds,axis=1)[:,0]) #prob for "entailment" class: (#input, #seen_classe)
-    assert len(pred_probs) == len(dev_examples)*len(train_class_set)
+    assert len(pred_probs) == len(dev_examples)*len(train_class_list)
     assert len(gold_class_ids) == len(dev_examples)
 
-    pred_probs = np.array(pred_probs).reshape(len(dev_examples),len(train_class_set))
+    pred_probs = np.array(pred_probs).reshape(len(dev_examples),len(train_class_list))
     pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
     pred_max_prob = list(np.amax(pred_probs, axis=1))
 
@@ -674,7 +674,7 @@ def main():
         pred_label_ids = []
         for i, pred_max_prob_i in enumerate(pred_max_prob):
             if pred_max_prob_i < threshold:
-                pred_label_ids.append(len(train_class_set)) #len(train_class_set) equals to ood index
+                pred_label_ids.append(len(train_class_list)) #len(train_class_set) equals to ood index
             else:
                 pred_label_ids.append(pred_label_ids_raw[i])
 
@@ -737,17 +737,17 @@ def main():
         preds = preds[0]
 
         pred_probs = list(softmax(preds,axis=1)[:,0]) #prob for "entailment" class: (#input, #seen_classe)
-        assert len(pred_probs) == len(test_examples)*len(train_class_set)
+        assert len(pred_probs) == len(test_examples)*len(train_class_list)
         assert len(gold_class_ids) == len(test_examples)
 
-        pred_probs = np.array(pred_probs).reshape(len(test_examples),len(train_class_set))
+        pred_probs = np.array(pred_probs).reshape(len(test_examples),len(train_class_list))
         pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
         pred_max_prob = list(np.amax(pred_probs, axis=1))
 
         pred_label_ids = []
         for i, pred_max_prob_i in enumerate(pred_max_prob):
             if pred_max_prob_i < best_threshold:
-                pred_label_ids.append(len(train_class_set)) #-1 means ood
+                pred_label_ids.append(len(train_class_list)) #-1 means ood
             else:
                 pred_label_ids.append(pred_label_ids_raw[i])
 
