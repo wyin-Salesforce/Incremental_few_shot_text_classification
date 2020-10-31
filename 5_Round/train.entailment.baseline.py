@@ -671,6 +671,7 @@ def main():
     rows, cols = gold_class_ids.shape
     for row in range(rows):
         assert len(set(gold_class_ids[row,:]))==1
+    gold_label_ids = list(gold_class_ids[:,0])
     pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
     pred_max_prob = list(np.amax(pred_probs, axis=1))
     pred_label_ids = []
@@ -743,6 +744,7 @@ def main():
         rows, cols = gold_class_ids.shape
         for row in range(rows):
             assert len(set(gold_class_ids[row,:]))==1
+        gold_label_ids = list(gold_class_ids[:,0])
         pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
         pred_max_prob = list(np.amax(pred_probs, axis=1))
         pred_label_ids = []
