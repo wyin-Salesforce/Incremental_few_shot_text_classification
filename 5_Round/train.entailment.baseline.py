@@ -600,6 +600,7 @@ def main():
     '''load training in list'''
     train_examples_list, train_class_list, train_class_2_split_list = processor.load_train(round_list[:-1]) # no odd training examples
     assert len(train_class_list) == len(train_class_2_split_list)
+    print('train_class_list:', len(train_class_list))
     assert len(train_class_list) ==  20+(len(round_list)-1)*10
     '''dev and test'''
     dev_examples = processor.load_dev_or_test(round_list, train_class_list, 'dev')
@@ -789,7 +790,7 @@ if __name__ == "__main__":
 
 '''
 
-CUDA_VISIBLE_DEVICES=7 python -u train.entailment.baseline.py --task_name rte --do_train --do_lower_case --num_train_epochs 2 --train_batch_size 10 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 64 --seed 42 --round_name 'r1'
+CUDA_VISIBLE_DEVICES=6 python -u train.entailment.baseline.py --task_name rte --do_train --do_lower_case --num_train_epochs 2 --train_batch_size 10 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 64 --seed 42 --round_name 'r1'
 
 
 '''
