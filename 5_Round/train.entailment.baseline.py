@@ -708,6 +708,7 @@ def main():
                             rount_hit+=1
                 acc_i = rount_hit/round_size
                 acc_each_round.append(acc_i)
+        acc_each_round[0]=acc_each_round[0]/2
         dev_mean_acc = np.mean(acc_each_round)
         if dev_mean_acc > best_acc_by_threshold:
             best_acc_by_threshold = dev_mean_acc
