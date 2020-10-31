@@ -684,8 +684,6 @@ def main():
                 pred_label_ids.append(pred_label_ids_raw[i])
 
         assert len(pred_label_ids) == len(gold_label_ids)
-        print('pred_label_ids:', pred_label_ids)
-        print('gold_label_ids:', gold_label_ids)
         acc_each_round = []
         for round_name_id in round_list:
             #base, n1, n2, ood
