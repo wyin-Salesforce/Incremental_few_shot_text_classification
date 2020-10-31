@@ -724,13 +724,12 @@ def main():
         logger.info("  Num examples = %d", len(test_examples))
 
         preds = []
-        gold_label_ids = []
-        for input_ids, input_mask, segment_ids, label_ids, premise_class_ids in test_dataloader:
+        gold_class_ids = []
+        for _, batch in enumerate(tqdm(test_dataloader, desc="test")):
+            input_ids, input_mask, segment_ids, label_ids, premise_class_ids = batch
             input_ids = input_ids.to(device)
             input_mask = input_mask.to(device)
-            # segment_ids = segment_ids.to(device)
-            # label_ids = label_ids.to(device)
-            gold_label_ids+=list(premise_class_ids.detach().cpu().numpy())
+            gold_class_ids+=list(premise_class_ids.detach().cpu().numpy())
 
             with torch.no_grad():
                 logits = model(input_ids, input_mask)
@@ -742,12 +741,18 @@ def main():
         preds = preds[0]
 
         pred_probs = list(softmax(preds,axis=1)[:,0]) #prob for "entailment" class: (#input, #seen_classe)
-        assert len(pred_probs) == len(test_examples)*len(train_class_list)
+        assert len(pred_probs) == len(test_examples)
         assert len(gold_class_ids) == len(test_examples)
 
-        pred_probs = np.array(pred_probs).reshape(len(test_examples),len(train_class_list))
+        pred_probs = np.array(pred_probs).reshape(len(test_examples)//len(train_class_list),len(train_class_list))
+        gold_class_ids = np.array(gold_class_ids).reshape(len(test_examples)//len(train_class_list),len(train_class_list))
+        '''verify gold_class_ids per row'''
+        rows, cols = gold_class_ids.shape
+        for row in range(rows):
+            assert len(set(gold_class_ids[row,:]))==1
         pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
         pred_max_prob = list(np.amax(pred_probs, axis=1))
+        gold_label_ids = list(gold_class_ids[:,0])
 
         pred_label_ids = []
         for i, pred_max_prob_i in enumerate(pred_max_prob):
