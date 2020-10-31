@@ -658,17 +658,22 @@ def main():
     preds = preds[0]
 
     pred_probs = list(softmax(preds,axis=1)[:,0]) #prob for "entailment" class: (#input, #seen_classe)
-    assert len(pred_probs) == len(dev_examples)*len(train_class_list)
+    assert len(pred_probs) == len(dev_examples)
     assert len(gold_class_ids) == len(dev_examples)
 
-    pred_probs = np.array(pred_probs).reshape(len(dev_examples),len(train_class_list))
+    pred_probs = np.array(pred_probs).reshape(len(dev_examples)//len(train_class_list),len(train_class_list))
+    gold_class_ids = np.array(gold_class_ids).reshape(len(dev_examples)//len(train_class_list),len(train_class_list))
+    '''verify gold_class_ids per row'''
+    rows, cols = gold_class_ids.shape
+    for row in range(rows):
+        assert len(set(gold_class_ids[row,:]))==1
     pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
     pred_max_prob = list(np.amax(pred_probs, axis=1))
 
 
     best_threshold = -0.1
     best_acc_by_threshold = 0.0
-    gold_label_ids = gold_class_ids
+    gold_label_ids = list(gold_class_ids[:,0]) #len(dev_examples)//len(train_class_list)
 
     for threshold in np.arange(0.99, 0.0, -0.01):
         pred_label_ids = []
