@@ -674,7 +674,7 @@ def main():
     pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
     pred_max_prob = list(np.amax(pred_probs, axis=1))
     pred_label_ids = []
-    for idd, value in emuerate(pred_label_ids_raw):
+    for idd, value in enumerate(pred_label_ids_raw):
         if pred_label_3way[idd][value]==0:
             pred_label_ids.append(value)
         else:
@@ -746,7 +746,7 @@ def main():
         pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
         pred_max_prob = list(np.amax(pred_probs, axis=1))
         pred_label_ids = []
-        for idd, value in emuerate(pred_label_ids_raw):
+        for idd, value in enumerate(pred_label_ids_raw):
             if pred_label_3way[idd][value]==0:
                 pred_label_ids.append(value)
             else:
