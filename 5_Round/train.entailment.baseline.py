@@ -601,8 +601,8 @@ def main():
     train_examples_list, train_class_list, train_class_2_split_list = processor.load_train(round_list[:-1]) # no odd training examples
     assert len(train_class_list) == len(train_class_2_split_list)
     '''dev and test'''
-    dev_examples = processor.load_dev_or_test(round_list, 'dev')
-    test_examples = processor.load_dev_or_test(round_list, 'test')
+    dev_examples = processor.load_dev_or_test(round_list, train_class_list, 'dev')
+    test_examples = processor.load_dev_or_test(round_list, train_class_list, 'test')
     entail_class_list = ['entailment', 'non-entailment']
     eval_class_list = train_class_list+['ood']
     test_split_list = train_class_2_split_list+['ood']
