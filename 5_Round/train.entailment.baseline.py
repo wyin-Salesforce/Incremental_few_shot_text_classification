@@ -600,8 +600,7 @@ def main():
     '''load training in list'''
     train_examples_list, train_class_list, train_class_2_split_list = processor.load_train(round_list[:-1]) # no odd training examples
     assert len(train_class_list) == len(train_class_2_split_list)
-    print('train_class_list:', len(train_class_list))
-    assert len(train_class_list) ==  20+(len(round_list)-1)*10
+    assert len(train_class_list) ==  20+(len(round_list)-2)*10
     '''dev and test'''
     dev_examples = processor.load_dev_or_test(round_list, train_class_list, 'dev')
     test_examples = processor.load_dev_or_test(round_list, train_class_list, 'test')
