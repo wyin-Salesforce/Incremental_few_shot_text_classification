@@ -380,7 +380,7 @@ def convert_examples_to_features(examples, label_list, eval_class_list, max_seq_
 
 
         features.append(
-                InputFeatures(guid = example.guid
+                InputFeatures(guid = example.guid,
                               input_ids=input_ids,
                               input_mask=input_mask,
                               segment_ids=segment_ids,
@@ -769,7 +769,7 @@ if __name__ == "__main__":
 
 '''
 
-CUDA_VISIBLE_DEVICES=7 python -u train.samecluster.baseline.py --task_name rte --do_train --do_lower_case --num_train_epochs 5 --train_batch_size 16 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 64 --seed 42 --round_name 'r1'
+CUDA_VISIBLE_DEVICES=7 python -u train.samecluster.baseline.py --task_name rte --do_train --do_lower_case --num_train_epochs 1 --train_batch_size 16 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 64 --seed 42 --round_name 'r1'
 
 
 '''
