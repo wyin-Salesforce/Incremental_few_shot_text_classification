@@ -443,8 +443,9 @@ def examples_to_features(source_examples, label_list, eval_class_list, args, tok
     dev_all_segment_ids = torch.tensor([f.segment_ids for f in source_features], dtype=torch.long)
     dev_all_label_ids = torch.tensor([f.label_id for f in source_features], dtype=torch.long)
     dev_all_premise_class_ids = torch.tensor([f.premise_class_id for f in source_features], dtype=torch.long)
+    dev_all_hypothesis_class_ids = torch.tensor([f.hypothesis_class_id for f in source_features], dtype=torch.long)
 
-    dev_data = TensorDataset(dev_all_guids, dev_all_input_ids, dev_all_input_mask, dev_all_segment_ids, dev_all_label_ids, dev_all_premise_class_ids)
+    dev_data = TensorDataset(dev_all_guids, dev_all_input_ids, dev_all_input_mask, dev_all_segment_ids, dev_all_label_ids, dev_all_premise_class_ids, dev_all_hypothesis_class_ids)
     if dataloader_mode=='sequential':
         dev_sampler = SequentialSampler(dev_data)
     else:
@@ -662,13 +663,13 @@ def main():
 
     '''evaluation'''
     model.eval()
-    '''dev'''
+    '''test'''
     acc_each_round = []
     preds = []
     gold_guids = []
     gold_premise_ids = []
     gold_hypothesis_ids = []
-    for _, batch in enumerate(tqdm(dev_dataloader, desc="dev")):
+    for _, batch in enumerate(tqdm(test_dataloader, desc="test")):
         guids, input_ids, input_mask, _, label_ids, premise_class_ids, hypothesis_class_id = batch
         input_ids = input_ids.to(device)
         input_mask = input_mask.to(device)
@@ -688,11 +689,11 @@ def main():
 
     pred_label_3way = np.argmax(preds, axis=1) #dev_examples, 0 means "entailment"
     pred_probs = list(preds[:,0]) #prob for "entailment" class: (#input, #seen_classe)
-    assert len(pred_label_3way) == len(dev_examples)
-    assert len(pred_probs) == len(dev_examples)
-    assert len(gold_premise_ids) == len(dev_examples)
-    assert len(gold_hypothesis_ids) == len(dev_examples)
-    assert len(gold_guids) == len(dev_examples)
+    assert len(pred_label_3way) == len(test_examples)
+    assert len(pred_probs) == len(test_examples)
+    assert len(gold_premise_ids) == len(test_examples)
+    assert len(gold_hypothesis_ids) == len(test_examples)
+    assert len(gold_guids) == len(test_examples)
 
     guid_2_premise_idlist = defaultdict(list)
     guid_2_hypoID_2_problist_labellist={}
@@ -711,7 +712,7 @@ def main():
 
     pred_label_ids = []
     gold_label_ids = []
-    for guid in range(dev_instance_size):
+    for guid in range(test_instance_size):
         assert len(set(guid_2_premise_idlist.get(guid))) == 1
         gold_label_ids.append(guid_2_premise_idlist.get(guid)[0])
         '''infer predict label id'''
