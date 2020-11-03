@@ -22,9 +22,9 @@ def compute(test_list):
     return str(average)+'$\\pm$'+str(res)
 
 def extract(flag):
-    filenames = ['log.prototype.'+flag+'.seed.42.txt',
-                 'log.prototype.'+flag+'.seed.16.txt',
-                 'log.prototype.'+flag+'.seed.32.txt']
+    filenames = ['log.entailment.'+flag+'.seed.42.txt',
+                 'log.entailment.'+flag+'.seed.16.txt',
+                 'log.entailment.'+flag+'.seed.32.txt']
     result_lists = []
     for fil in filenames:
         readfile = codecs.open('/export/home/workspace/Incremental_few_shot_text_classification/5_Round/'+fil, 'r', 'utf-8')
