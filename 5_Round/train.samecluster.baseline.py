@@ -636,7 +636,7 @@ def main():
     test_split_list = train_class_2_split_list+['ood']
     train_dataloader_list = []
     for train_examples in train_examples_list:
-        train_dataloader = examples_to_features(train_examples, entail_class_list, eval_class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='random')
+        train_dataloader = examples_to_features(train_examples[:1000], entail_class_list, eval_class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='random')
         train_dataloader_list.append(train_dataloader)
     dev_dataloader = examples_to_features(dev_examples, entail_class_list, eval_class_list, args, tokenizer, args.eval_batch_size, "classification", dataloader_mode='sequential')
     test_dataloader = examples_to_features(test_examples, entail_class_list, eval_class_list, args, tokenizer, args.eval_batch_size, "classification", dataloader_mode='sequential')
