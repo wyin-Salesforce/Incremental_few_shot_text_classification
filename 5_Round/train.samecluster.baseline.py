@@ -726,7 +726,7 @@ def main():
             labellist = problist_labellist[1]
             same_cluter_times = labellist.count(0) #'entailment' is the first label
             same_cluter=False
-            if same_cluter_times/len(labellist) >=0.5:
+            if same_cluter_times/len(labellist) >0.5:
                 same_cluter=True
 
             if same_cluter is True and mean_prob > final_max_mean_prob:
