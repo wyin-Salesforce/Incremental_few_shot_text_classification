@@ -192,8 +192,13 @@ class RteProcessor(DataProcessor):
                 wordlist_in_class = class_name.split('_')
                 random.shuffle(wordlist_in_class)
                 examples_this_round.append( InputExample(guid=round, text_a=example_str, text_b=' '.join(wordlist_in_class), label='non-entailment', premise_class=class_name))
-                '''negative pairs'''
-                negative_class_set = set(class_list_up_to_now)-set([class_name])
+                for i in range(5):
+                    new_premise_wordlist = example_str.split()
+                    random.shuffle(new_premise_wordlist)
+                    examples_this_round.append( InputExample(guid=round, text_a=' '.join(new_premise_wordlist), text_b=class_str, label='non-entailment', premise_class=class_name))
+
+                '''negative pairs 就在本round里面找了'''
+                negative_class_set = set(class_set_in_this_round)-set([class_name])
                 for negative_class in negative_class_set:
                     class_str = ' '.join(negative_class.split('_'))
                     examples_this_round.append( InputExample(guid=round, text_a=example_str, text_b=class_str, label='non-entailment', premise_class=class_name))
