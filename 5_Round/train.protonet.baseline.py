@@ -841,6 +841,9 @@ def main():
                 gold_binary_list = []
                 pred_binary_list = []
                 for ii, gold_label_id in enumerate(gold_label_ids):
+                    if test_split_list[gold_label_id] == round_name_id:
+                        print('gold_label_id:', gold_label_id)
+                        exit(0)
                     gold_binary_list.append(1 if gold_label_id==-1 else 0)
                     pred_binary_list.append(1 if pred_label_ids[ii]==-1 else 0)
                 print('sum(gold_binary_list):', sum(gold_binary_list))
