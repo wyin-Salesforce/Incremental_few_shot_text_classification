@@ -641,6 +641,7 @@ def main():
     '''training'''
     max_test_acc = 0.0
     max_dev_acc = 0.0
+
     for _ in range(args.num_train_epochs):
         train_support_examples_list, full_query_examples, selected_class_list = processor.load_base_train() #we do not use ood as training
         train_support_dataloader_list = []
@@ -654,6 +655,7 @@ def main():
 
         print('class rep build over')
         '''then compute rep for query batch'''
+        best_threshold = []
         for _, batch in enumerate(tqdm(train_query_dataloader, desc="train")):
             model.train()
             batch = tuple(t.to(device) for t in batch)
@@ -688,7 +690,10 @@ def main():
             optimizer.step()
             optimizer.zero_grad()
             scores_for_positive = logits[torch.arange(logits.shape[0]), label_ids.view(-1)].mean()
-            print('scores_for_positive:', scores_for_positive)
+            best_threshold.append(scores_for_positive.item())
+
+        best_threshold = sum(best_threshold) / len(best_threshold)
+        print('best_threshold:', best_threshold )
 
         '''evaluation'''
         model.eval()
@@ -709,7 +714,7 @@ def main():
         all_class_proto_reps = torch.cat(all_class_proto_reps, axis=0) #(#class, hidden)
         support_normalized_rep = all_class_proto_reps/(1e-8+torch.sqrt(torch.sum(torch.square(all_class_proto_reps), axis=1, keepdim=True)))
 
-        best_threshold = 0.5
+
         logger.info("***** Running test *****")
         logger.info("  Num examples = %d", len(test_examples))
 
