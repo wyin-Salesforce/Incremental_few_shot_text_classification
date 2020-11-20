@@ -784,7 +784,7 @@ def main():
         #     max_dev_acc = dev_acc
         #     print('\ndev acc:', best_acc_by_list, 'threshold:', best_threshold,' max_dev_acc:', max_dev_acc, '\n')
 
-        best_threshold = 0.5
+        best_threshold = 0.9
         logger.info("***** Running test *****")
         logger.info("  Num examples = %d", len(test_examples))
 
@@ -863,7 +863,7 @@ if __name__ == "__main__":
 
 '''
 
-CUDA_VISIBLE_DEVICES=7 python -u train.protonet.baseline.py --task_name rte --do_train --do_lower_case --num_train_epochs 50 --train_batch_size 10 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 64 --seed 42 --round_name 'r1'
+CUDA_VISIBLE_DEVICES=7 python -u train.protonet.baseline.py --task_name rte --do_train --do_lower_case --num_train_epochs 50 --train_batch_size 10 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 64 --seed 42 --round_name 'base'
 
 
 '''
