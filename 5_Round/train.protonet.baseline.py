@@ -784,7 +784,7 @@ def main():
         #     max_dev_acc = dev_acc
         #     print('\ndev acc:', best_acc_by_list, 'threshold:', best_threshold,' max_dev_acc:', max_dev_acc, '\n')
 
-        best_threshold = 0.5
+        best_threshold = 0.9
         logger.info("***** Running test *****")
         logger.info("  Num examples = %d", len(test_examples))
 
@@ -849,8 +849,6 @@ def main():
                         overlap +=1
                 recall = overlap/(1e-6+sum(gold_binary_list))
                 precision = overlap/(1e-6+sum(pred_binary_list))
-
-
 
                 acc_i = 2*recall*precision/(1e-6+recall+precision)
                 acc_each_round.append(acc_i)
