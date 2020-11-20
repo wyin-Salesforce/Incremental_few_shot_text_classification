@@ -687,7 +687,7 @@ def main():
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-            scores_for_positive = logits[torch.arange(logits.shape[0], label_ids)].mean()
+            scores_for_positive = logits[torch.arange(logits.shape[0]), label_ids.view(-1)].mean()
             print('scores_for_positive:', scores_for_positive)
 
         '''evaluation'''
