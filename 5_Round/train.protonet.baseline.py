@@ -847,12 +847,12 @@ def main():
                 for i in range(len(gold_binary_list)):
                     if gold_binary_list[i] == 1 and pred_binary_list[i]==1:
                         overlap +=1
-                recall = overlap/sum(gold_binary_list)
-                precision = overlap/sum(pred_binary_list)
+                recall = overlap/(1e-6+sum(gold_binary_list))
+                precision = overlap/(1e-6+sum(pred_binary_list))
 
 
 
-                acc_i = 2*recall*precision/(recall+precision)
+                acc_i = 2*recall*precision/(1e-6+recall+precision)
                 acc_each_round.append(acc_i)
 
         print('\n\t\t test_acc:', acc_each_round)
