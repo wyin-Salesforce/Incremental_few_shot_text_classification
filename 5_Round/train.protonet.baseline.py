@@ -773,8 +773,6 @@ def main():
                 for ii, gold_label_id in enumerate(gold_label_ids):
                     gold_binary_list.append(1 if test_split_list[gold_label_id] == round_name_id else 0)
                     pred_binary_list.append(1 if pred_label_ids[ii]==-1 else 0)
-                # print('sum(gold_binary_list):', sum(gold_binary_list))
-                # print('sum(pred_binary_list):', sum(pred_binary_list))
                 overlap = 0
                 for i in range(len(gold_binary_list)):
                     if gold_binary_list[i] == 1 and pred_binary_list[i]==1:
