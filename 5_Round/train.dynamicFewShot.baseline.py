@@ -690,7 +690,7 @@ def main():
             logits = model(input_ids, input_mask, output_rep=False)
             loss_fct = CrossEntropyLoss()
 
-            loss = loss_fct(logits.view(-1, num_labels), label_ids.view(-1))
+            loss = loss_fct(logits.view(-1, len(base_class_list)), label_ids.view(-1))
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
