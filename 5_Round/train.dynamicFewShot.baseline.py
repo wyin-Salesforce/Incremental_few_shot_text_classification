@@ -748,7 +748,7 @@ def main():
             logits = model_stage_2(input_ids, input_mask, model, novel_class_support_reps= novel_class_support_reps, fake_novel_size=fake_novel_size, base_class_mapping = original_base_class_idlist)
             loss_fct = CrossEntropyLoss()
 
-            loss = loss_fct(logits.view(-1, num_labels), label_ids.view(-1))
+            loss = loss_fct(logits.view(-1, len(base_class_list)), label_ids.view(-1))
             loss.backward()
             optimizer_stage_2.step()
             optimizer_stage_2.zero_grad()
