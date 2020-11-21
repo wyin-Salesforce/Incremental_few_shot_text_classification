@@ -189,7 +189,7 @@ class RteProcessor(DataProcessor):
                 '''positive pair'''
                 examples_this_round.append( InputExample(guid=round, text_a=example_str, text_b=class_str, label='entailment', premise_class=class_name))
                 '''negative pairs'''
-                negative_class_set = set(class_list_up_to_now)-set([class_name])
+                negative_class_set = set(class_set_in_this_round)-set([class_name])
                 for negative_class in negative_class_set:
                     class_str = ' '.join(negative_class.split('_'))
                     examples_this_round.append( InputExample(guid=round, text_a=example_str, text_b=class_str, label='non-entailment', premise_class=class_name))
