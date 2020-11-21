@@ -868,6 +868,7 @@ def main():
             for ii, gold_label_id in enumerate(gold_label_ids):
                 if test_split_list[gold_label_id] == round_name_id:
                     round_size+=1
+                    print('gold_label_id:', gold_label_id, 'pred_label_ids[ii]:', pred_label_ids[ii])
                     if gold_label_id == pred_label_ids[ii]:
                         rount_hit+=1
             acc_i = rount_hit/round_size
