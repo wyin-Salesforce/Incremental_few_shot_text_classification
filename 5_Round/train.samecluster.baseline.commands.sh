@@ -3,7 +3,7 @@ export EPOCHSIZE=5
 export SEED=42 #42, 16, 32
 export LEARNINGRATE=1e-6
 
-
+#running time: 45mins per epoch
 
 CUDA_VISIBLE_DEVICES=0 python -u train.samecluster.baseline.py \
     --task_name rte \
