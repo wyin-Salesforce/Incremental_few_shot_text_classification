@@ -870,7 +870,7 @@ def main():
             for ii, gold_label_id in enumerate(gold_label_ids):
                 if test_split_list[gold_label_id] == round_name_id:
                     round_size+=1
-                    print('gold_label_id:', gold_label_id, 'pred_label_ids[ii]:', pred_label_ids[ii])
+                    # print('gold_label_id:', gold_label_id, 'pred_label_ids[ii]:', pred_label_ids[ii])
                     if gold_label_id == pred_label_ids[ii]:
                         rount_hit+=1
             acc_i = rount_hit/round_size
@@ -880,6 +880,7 @@ def main():
             gold_binary_list = []
             pred_binary_list = []
             for ii, gold_label_id in enumerate(gold_label_ids):
+                print('gold_label_id:', gold_label_id, 'pred_label_ids[ii]:', pred_label_ids[ii])
                 gold_binary_list.append(1 if test_split_list[gold_label_id] == round_name_id else 0)
                 pred_binary_list.append(1 if pred_label_ids[ii]==seen_class_list_size else 0)
             overlap = 0
