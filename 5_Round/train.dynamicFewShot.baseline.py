@@ -800,7 +800,7 @@ def main():
     '''support for all seen classes'''
     class_2_support_examples, seen_class_list = processor.load_support_all_rounds(round_list[:-1]) #no support set for ood
     assert seen_class_list[:len(base_class_list)] == base_class_list
-    # seen_class_list = list(class_2_support_examples.keys())
+    seen_class_list_size = list(seen_class_list)
     support_example_lists = [class_2_support_examples.get(seen_class)  for seen_class in seen_class_list if seen_class not in base_class_list]
 
     novel_class_support_reps = []
@@ -820,8 +820,13 @@ def main():
     assert len(novel_class_support_reps)+len(base_class_list) ==  len(seen_class_list)
     print('Extracting support reps for all  novel is over.')
     test_examples, test_class_list = processor.load_dev_or_test(round_list, seen_class_list, 'test')
+    test_split_list = []
+    for test_class_i in test_class_list:
+        test_split_list.append(class_2_split.get(test_class_i))
     test_dataloader = examples_to_features(test_examples, test_class_list, args, tokenizer, args.eval_batch_size, "classification", dataloader_mode='sequential')
     '''test on test batch '''
+    preds = []
+    gold_label_ids = []
     for input_ids, input_mask, segment_ids, label_ids in test_dataloader:
         input_ids = input_ids.to(device)
         input_mask = input_mask.to(device)
@@ -831,64 +836,58 @@ def main():
         model_stage_2.eval()
         with torch.no_grad():
             logits = model_stage_2(input_ids, input_mask, model, novel_class_support_reps= novel_class_support_reps, fake_novel_size=None, base_class_mapping = None)
-        loss_fct = CrossEntropyLoss()
 
+        if len(preds) == 0:
+            preds.append(logits.detach().cpu().numpy())
+        else:
+            preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
 
+    preds = preds[0]
 
+    pred_probs = preds#softmax(preds,axis=1)
+    pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
+    pred_max_prob = list(np.amax(pred_probs, axis=1))
 
-            if len(preds) == 0:
-                preds.append(logits.detach().cpu().numpy())
-            else:
-                preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
+    pred_label_ids = []
+    for i, pred_max_prob_i in enumerate(pred_max_prob):
+        if pred_max_prob_i < 0.5:
+            pred_label_ids.append(seen_class_list_size) #seen_class_list_size means ood
+        else:
+            pred_label_ids.append(pred_label_ids_raw[i])
 
-        preds = preds[0]
+    assert len(pred_label_ids) == len(gold_label_ids)
+    acc_each_round = []
+    for round_name_id in round_list:
+        #base, n1, n2, ood
+        round_size = 0
+        rount_hit = 0
+        if round_name_id != 'ood':
+            for ii, gold_label_id in enumerate(gold_label_ids):
+                if test_split_list[gold_label_id] == round_name_id:
+                    round_size+=1
+                    if gold_label_id == pred_label_ids[ii]:
+                        rount_hit+=1
+            acc_i = rount_hit/round_size
+            acc_each_round.append(acc_i)
+        else:
+            '''ood f1'''
+            gold_binary_list = []
+            pred_binary_list = []
+            for ii, gold_label_id in enumerate(gold_label_ids):
+                gold_binary_list.append(1 if test_split_list[gold_label_id] == round_name_id else 0)
+                pred_binary_list.append(1 if pred_label_ids[ii]==seen_class_list_size else 0)
+            overlap = 0
+            for i in range(len(gold_binary_list)):
+                if gold_binary_list[i] == 1 and pred_binary_list[i]==1:
+                    overlap +=1
+            recall = overlap/(1e-6+sum(gold_binary_list))
+            precision = overlap/(1e-6+sum(pred_binary_list))
 
-        pred_probs = preds#softmax(preds,axis=1)
-        pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
-        pred_max_prob = list(np.amax(pred_probs, axis=1))
+            acc_i = 2*recall*precision/(1e-6+recall+precision)
+            acc_each_round.append(acc_i)
 
-        pred_label_ids = []
-        for i, pred_max_prob_i in enumerate(pred_max_prob):
-            if pred_max_prob_i < best_threshold:
-                pred_label_ids.append(-1) #-1 means ood
-            else:
-                pred_label_ids.append(pred_label_ids_raw[i])
-
-
-        gold_label_ids = gold_label_ids
-        assert len(pred_label_ids) == len(gold_label_ids)
-        acc_each_round = []
-        for round_name_id in round_list:
-            #base, n1, n2, ood
-            round_size = 0
-            rount_hit = 0
-            if round_name_id != 'ood':
-                for ii, gold_label_id in enumerate(gold_label_ids):
-                    if test_split_list[gold_label_id] == round_name_id:
-                        round_size+=1
-                        if gold_label_id == pred_label_ids[ii]:
-                            rount_hit+=1
-                acc_i = rount_hit/round_size
-                acc_each_round.append(acc_i)
-            else:
-                '''ood f1'''
-                gold_binary_list = []
-                pred_binary_list = []
-                for ii, gold_label_id in enumerate(gold_label_ids):
-                    gold_binary_list.append(1 if test_split_list[gold_label_id] == round_name_id else 0)
-                    pred_binary_list.append(1 if pred_label_ids[ii]==-1 else 0)
-                overlap = 0
-                for i in range(len(gold_binary_list)):
-                    if gold_binary_list[i] == 1 and pred_binary_list[i]==1:
-                        overlap +=1
-                recall = overlap/(1e-6+sum(gold_binary_list))
-                precision = overlap/(1e-6+sum(pred_binary_list))
-
-                acc_i = 2*recall*precision/(1e-6+recall+precision)
-                acc_each_round.append(acc_i)
-
-        print('\n\t\t test_acc:', acc_each_round)
-        final_test_performance = acc_each_round
+    print('\n\t\t test_acc:', acc_each_round)
+    final_test_performance = acc_each_round
 
     print('final_test_performance:', final_test_performance)
 
