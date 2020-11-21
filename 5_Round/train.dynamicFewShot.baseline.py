@@ -824,7 +824,7 @@ def main():
     print('Extracting support reps for all  novel is over.')
     test_examples = processor.load_dev_or_test(round_list, 'test')
     test_class_list = seen_class_list+list(ood_class_set)
-    print('test_class_list:', test_class_list)
+    print('test_class_list:', len(test_class_list))
     test_split_list = []
     for test_class_i in test_class_list:
         test_split_list.append(class_2_split.get(test_class_i))
