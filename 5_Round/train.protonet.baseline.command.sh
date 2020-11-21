@@ -3,7 +3,7 @@ export EPOCHSIZE=50 #50
 export SEED=32 #42, 16, 32
 export LEARNINGRATE=1e-6
 
-
+#running time: ~90mins
 
 CUDA_VISIBLE_DEVICES=0 python -u train.protonet.baseline.py \
     --task_name rte \
