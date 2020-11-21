@@ -637,17 +637,18 @@ def main():
 
     '''evaluation'''
     model.eval()
-    '''dev'''
-    acc_each_round = []
+
+
+    logger.info("***** Running test *****")
+    logger.info("  Num examples = %d", len(test_examples))
+
     preds = []
     gold_class_ids = []
-    for _, batch in enumerate(tqdm(dev_dataloader, desc="dev")):
-        input_ids, input_mask, _, label_ids, premise_class_ids = batch
+    for _, batch in enumerate(tqdm(test_dataloader, desc="test")):
+        input_ids, input_mask, segment_ids, label_ids, premise_class_ids = batch
         input_ids = input_ids.to(device)
         input_mask = input_mask.to(device)
-
         gold_class_ids+=list(premise_class_ids.detach().cpu().numpy())
-
 
         with torch.no_grad():
             logits = model(input_ids, input_mask)
@@ -655,19 +656,18 @@ def main():
             preds.append(logits.detach().cpu().numpy())
         else:
             preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
-    preds = softmax(preds[0],axis=1)
 
+    preds = softmax(preds[0],axis=1)
     pred_label_3way = np.argmax(preds, axis=1) #dev_examples, 0 means "entailment"
     pred_probs = list(preds[:,0]) #prob for "entailment" class: (#input, #seen_classe)
-    assert len(pred_label_3way) == len(dev_examples)
-    assert len(pred_probs) == len(dev_examples)
-    assert len(gold_class_ids) == len(dev_examples)
+    assert len(pred_label_3way) == len(test_examples)
+    assert len(pred_probs) == len(test_examples)
+    assert len(gold_class_ids) == len(test_examples)
 
 
-    pred_label_3way = np.array(pred_label_3way).reshape(len(dev_examples)//len(train_class_list),len(train_class_list))
-    # print('pred_label_3way:', pred_label_3way[pred_label_3way.shape[0]-5:, :])
-    pred_probs = np.array(pred_probs).reshape(len(dev_examples)//len(train_class_list),len(train_class_list))
-    gold_class_ids = np.array(gold_class_ids).reshape(len(dev_examples)//len(train_class_list),len(train_class_list))
+    pred_label_3way = np.array(pred_label_3way).reshape(len(test_examples)//len(train_class_list),len(train_class_list))
+    pred_probs = np.array(pred_probs).reshape(len(test_examples)//len(train_class_list),len(train_class_list))
+    gold_class_ids = np.array(gold_class_ids).reshape(len(test_examples)//len(train_class_list),len(train_class_list))
     '''verify gold_class_ids per row'''
     rows, cols = gold_class_ids.shape
     for row in range(rows):
@@ -682,8 +682,6 @@ def main():
         else:
             pred_label_ids.append(len(train_class_list))
 
-    # print('pred_label_ids:', pred_label_ids)
-    # print('gold_label_ids:', gold_label_ids)
     assert len(pred_label_ids) == len(gold_label_ids)
     acc_each_round = []
     for round_name_id in round_list:
@@ -700,90 +698,20 @@ def main():
             acc_each_round.append(acc_i)
         else:
             '''ood acc'''
+            gold_binary_list = []
+            pred_binary_list = []
             for ii, gold_label_id in enumerate(gold_label_ids):
-                if test_split_list[gold_label_id] == round_name_id:
-                    round_size+=1
-                    if pred_label_ids[ii]==len(train_class_list):
-                        rount_hit+=1
-            acc_i = rount_hit/round_size
+                gold_binary_list.append(1 if test_split_list[gold_label_id] == round_name_id else 0)
+                pred_binary_list.append(1 if pred_label_ids[ii]==len(train_class_list) else 0)
+            overlap = 0
+            for i in range(len(gold_binary_list)):
+                if gold_binary_list[i] == 1 and pred_binary_list[i]==1:
+                    overlap +=1
+            recall = overlap/(1e-6+sum(gold_binary_list))
+            precision = overlap/(1e-6+sum(pred_binary_list))
+            acc_i = 2*recall*precision/(1e-6+recall+precision)
             acc_each_round.append(acc_i)
-    dev_acc = np.mean(acc_each_round)
-
-    if dev_acc > max_dev_acc:
-        max_dev_acc = dev_acc
-        print('\ndev acc:', acc_each_round, '\n')
-
-
-        logger.info("***** Running test *****")
-        logger.info("  Num examples = %d", len(test_examples))
-
-        preds = []
-        gold_class_ids = []
-        for _, batch in enumerate(tqdm(test_dataloader, desc="test")):
-            input_ids, input_mask, segment_ids, label_ids, premise_class_ids = batch
-            input_ids = input_ids.to(device)
-            input_mask = input_mask.to(device)
-            gold_class_ids+=list(premise_class_ids.detach().cpu().numpy())
-
-            with torch.no_grad():
-                logits = model(input_ids, input_mask)
-            if len(preds) == 0:
-                preds.append(logits.detach().cpu().numpy())
-            else:
-                preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
-
-        preds = softmax(preds[0],axis=1)
-        pred_label_3way = np.argmax(preds, axis=1) #dev_examples, 0 means "entailment"
-        pred_probs = list(preds[:,0]) #prob for "entailment" class: (#input, #seen_classe)
-        assert len(pred_label_3way) == len(test_examples)
-        assert len(pred_probs) == len(test_examples)
-        assert len(gold_class_ids) == len(test_examples)
-
-
-        pred_label_3way = np.array(pred_label_3way).reshape(len(test_examples)//len(train_class_list),len(train_class_list))
-        pred_probs = np.array(pred_probs).reshape(len(test_examples)//len(train_class_list),len(train_class_list))
-        gold_class_ids = np.array(gold_class_ids).reshape(len(test_examples)//len(train_class_list),len(train_class_list))
-        '''verify gold_class_ids per row'''
-        rows, cols = gold_class_ids.shape
-        for row in range(rows):
-            assert len(set(gold_class_ids[row,:]))==1
-        gold_label_ids = list(gold_class_ids[:,0])
-        pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
-        pred_max_prob = list(np.amax(pred_probs, axis=1))
-        pred_label_ids = []
-        for idd, seen_class_id in enumerate(pred_label_ids_raw):
-            if pred_label_3way[idd][seen_class_id]==0:
-                pred_label_ids.append(seen_class_id)
-            else:
-                pred_label_ids.append(len(train_class_list))
-
-        assert len(pred_label_ids) == len(gold_label_ids)
-        acc_each_round = []
-        for round_name_id in round_list:
-            #base, n1, n2, ood
-            round_size = 0
-            rount_hit = 0
-            if round_name_id != 'ood':
-                for ii, gold_label_id in enumerate(gold_label_ids):
-                    if test_split_list[gold_label_id] == round_name_id:
-                        round_size+=1
-                        if gold_label_id == pred_label_ids[ii]:
-                            rount_hit+=1
-                acc_i = rount_hit/round_size
-                acc_each_round.append(acc_i)
-            else:
-                '''ood acc'''
-                for ii, gold_label_id in enumerate(gold_label_ids):
-                    if test_split_list[gold_label_id] == round_name_id:
-                        round_size+=1
-                        if pred_label_ids[ii]==len(train_class_list):
-                            rount_hit+=1
-                acc_i = rount_hit/round_size
-                acc_each_round.append(acc_i)
-        final_test_performance = acc_each_round
-
-
-
+    final_test_performance = acc_each_round
     print('final_test_performance:', final_test_performance)
 
 if __name__ == "__main__":
