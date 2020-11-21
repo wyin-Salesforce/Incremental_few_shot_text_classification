@@ -780,6 +780,7 @@ def main():
 
 
             logits = model_stage_2(input_ids, input_mask, model, novel_class_support_reps= novel_class_support_reps, fake_novel_size=fake_novel_size, base_class_mapping = original_base_class_idlist)
+            print('logits:', logits)
             loss_fct = CrossEntropyLoss()
 
             loss = loss_fct(logits.view(-1, len(base_class_list)), label_ids.view(-1))
@@ -855,7 +856,7 @@ def main():
 
     pred_label_ids = []
     for i, pred_max_prob_i in enumerate(pred_max_prob):
-        if pred_max_prob_i < 0.85:
+        if pred_max_prob_i < 0.0:
             pred_label_ids.append(seen_class_list_size) #seen_class_list_size means ood
         else:
             pred_label_ids.append(pred_label_ids_raw[i])
@@ -880,7 +881,7 @@ def main():
             gold_binary_list = []
             pred_binary_list = []
             for ii, gold_label_id in enumerate(gold_label_ids):
-                print('gold_label_id:', gold_label_id, 'pred_label_ids[ii]:', pred_label_ids[ii])
+                # print('gold_label_id:', gold_label_id, 'pred_label_ids[ii]:', pred_label_ids[ii])
                 gold_binary_list.append(1 if test_split_list[gold_label_id] == round_name_id else 0)
                 pred_binary_list.append(1 if pred_label_ids[ii]==seen_class_list_size else 0)
             overlap = 0
