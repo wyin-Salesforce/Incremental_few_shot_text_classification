@@ -780,7 +780,7 @@ def main():
 
 
             logits = model_stage_2(input_ids, input_mask, model, novel_class_support_reps= novel_class_support_reps, fake_novel_size=fake_novel_size, base_class_mapping = original_base_class_idlist)
-            print('logits:', logits)
+            # print('logits:', logits)
             loss_fct = CrossEntropyLoss()
 
             loss = loss_fct(logits.view(-1, len(base_class_list)), label_ids.view(-1))
@@ -856,7 +856,7 @@ def main():
 
     pred_label_ids = []
     for i, pred_max_prob_i in enumerate(pred_max_prob):
-        if pred_max_prob_i < 0.0:
+        if pred_max_prob_i < 0.1:
             pred_label_ids.append(seen_class_list_size) #seen_class_list_size means ood
         else:
             pred_label_ids.append(pred_label_ids_raw[i])
