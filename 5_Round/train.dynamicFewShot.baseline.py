@@ -816,7 +816,7 @@ def main():
                 support_rep_for_novel_class = model(input_ids, input_mask, output_rep=True)
             single_class_support_reps.append(support_rep_for_novel_class)
         single_class_support_reps = torch.cat(single_class_support_reps,axis=0)
-    novel_class_support_reps.append(single_class_support_reps)
+        novel_class_support_reps.append(single_class_support_reps)
     print('len(novel_class_support_reps):', len(novel_class_support_reps))
     print('len(base_class_list):', len(base_class_list))
     print('len(seen_class_list):', len(seen_class_list))
