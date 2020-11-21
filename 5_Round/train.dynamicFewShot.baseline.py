@@ -800,7 +800,7 @@ def main():
     '''support for all seen classes'''
     class_2_support_examples, seen_class_list = processor.load_support_all_rounds(round_list[:-1]) #no support set for ood
     assert seen_class_list[:len(base_class_list)] == base_class_list
-    seen_class_list_size = list(seen_class_list)
+    seen_class_list_size = len(seen_class_list)
     support_example_lists = [class_2_support_examples.get(seen_class)  for seen_class in seen_class_list if seen_class not in base_class_list]
 
     novel_class_support_reps = []
