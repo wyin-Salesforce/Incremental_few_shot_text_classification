@@ -747,6 +747,7 @@ def main():
                              lr=args.learning_rate)
     mean_loss = 0.0
     count =0
+    best_threshold = 0.0
     for _ in trange(int(args.num_train_epochs), desc="Stage2Epoch"):
         '''first, select some base classes as fake novel classes'''
         fake_novel_size = 5
@@ -773,6 +774,7 @@ def main():
         print('Extracting support reps for fake novel is over.')
         '''retrain on query set to optimize the weight generator'''
         train_dataloader = examples_to_features(train_examples, shuffled_base_class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='random')
+        best_threshold_list = []
         for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
             model_stage_2.train()
             batch = tuple(t.to(device) for t in batch)
@@ -791,6 +793,11 @@ def main():
             count+=1
             if count % 50 == 0:
                 print('mean loss:', mean_loss/count)
+            scores_for_positive = logits[torch.arange(logits.shape[0]), label_ids.view(-1)].mean()
+            best_threshold_list.append(scores_for_positive.item())
+
+        best_threshold = sum(best_threshold_list) / len(best_threshold_list)
+    print('best_threshold:', best_threshold )
     print('stage 2 training over')
 
     '''
@@ -856,7 +863,7 @@ def main():
 
     pred_label_ids = []
     for i, pred_max_prob_i in enumerate(pred_max_prob):
-        if pred_max_prob_i < 0.1:
+        if pred_max_prob_i < best_threshold:
             pred_label_ids.append(seen_class_list_size) #seen_class_list_size means ood
         else:
             pred_label_ids.append(pred_label_ids_raw[i])
