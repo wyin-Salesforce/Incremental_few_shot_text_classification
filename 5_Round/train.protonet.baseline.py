@@ -652,8 +652,6 @@ def main():
         train_query_dataloader = examples_to_features(full_query_examples, selected_class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='random')
 
 
-
-        print('class rep build over')
         '''then compute rep for query batch'''
         best_threshold = []
         for _, batch in enumerate(tqdm(train_query_dataloader, desc="train")):

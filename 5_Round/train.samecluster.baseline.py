@@ -180,14 +180,16 @@ class RteProcessor(DataProcessor):
                 sent = parts[1].strip()
                 class_2_sentlist_in_this_round[class_name].append(sent)
             if round == 'base':
+                '''for base classes, we only keep 5 examples'''
                 for key in class_2_sentlist_in_this_round.keys():
                     truncate_values = class_2_sentlist_in_this_round.get(key)
                     random.shuffle(truncate_values)
                     class_2_sentlist_in_this_round[key] = truncate_values[:5]
             class_2_sentlist_upto_this_round = {**class_2_sentlist_upto_this_round, **class_2_sentlist_in_this_round}
             readfile.close()
-            class_list_up_to_now += list(class_2_sentlist_in_this_round.keys())
-            round_indicator_up_to_now+=[round]*len(class_2_sentlist_in_this_round.keys())
+            class_set_in_this_round = set(class_2_sentlist_in_this_round.keys())
+            class_list_up_to_now += list(class_set_in_this_round)
+            round_indicator_up_to_now+=[round]*len(class_set_in_this_round)
             '''truncate to 5 for 'base' class'''
 
             '''transform each example into entailment pair'''
@@ -206,7 +208,7 @@ class RteProcessor(DataProcessor):
                     if hypo_str !=example_str:
                         examples_this_round.append( InputExample(guid=0, text_a=example_str, text_b=hypo_str, label='entailment', premise_class=class_name, hypothesis_class = class_name))
                 '''negative pairs'''
-                negative_class_set = set(class_list_up_to_now)-set([class_name])
+                negative_class_set = set(class_set_in_this_round)-set([class_name])
                 for negative_class in negative_class_set:
                     sent_candidate = class_2_sentlist_upto_this_round.get(negative_class)
                     assert len(sent_candidate) > 0
@@ -753,15 +755,19 @@ def main():
             acc_each_round.append(acc_i)
         else:
             '''ood acc'''
+            gold_binary_list = []
+            pred_binary_list = []
             for ii, gold_label_id in enumerate(gold_label_ids):
-                if test_split_list[gold_label_id] == round_name_id:
-                    round_size+=1
-                    if pred_label_ids[ii]==len(train_class_list):
-                        rount_hit+=1
-            acc_i = rount_hit/round_size
+                gold_binary_list.append(1 if test_split_list[gold_label_id] == round_name_id else 0)
+                pred_binary_list.append(1 if pred_label_ids[ii]==len(train_class_list) else 0)
+            overlap = 0
+            for i in range(len(gold_binary_list)):
+                if gold_binary_list[i] == 1 and pred_binary_list[i]==1:
+                    overlap +=1
+            recall = overlap/(1e-6+sum(gold_binary_list))
+            precision = overlap/(1e-6+sum(pred_binary_list))
+            acc_i = 2*recall*precision/(1e-6+recall+precision)
             acc_each_round.append(acc_i)
-    # dev_acc = np.mean(acc_each_round)
-
 
     print('final_test_performance:', acc_each_round)
 

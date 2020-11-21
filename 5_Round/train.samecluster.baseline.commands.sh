@@ -1,6 +1,6 @@
 export BATCHSIZE=32
 export EPOCHSIZE=5
-export SEED=32 #42, 16, 32
+export SEED=42 #42, 16, 32
 export LEARNINGRATE=1e-6
 
 
