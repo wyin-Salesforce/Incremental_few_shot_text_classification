@@ -1,6 +1,6 @@
 export BATCHSIZE=16
 export EPOCHSIZE=5
-export SEED=42 #42, 16, 32
+export SEED=16 #42, 16, 32
 export LEARNINGRATE=1e-6
 
 #running time: 10mins per epoch
