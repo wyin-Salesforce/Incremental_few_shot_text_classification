@@ -700,7 +700,7 @@ def main():
                 print('mean loss:', mean_loss/count)
     print('stage 1, train supervised classification on base is over.')
     '''now, train the second stage'''
-    model_stage_2 = ModelStageTwo(len(base_class_list))
+    model_stage_2 = ModelStageTwo())
     model_stage_2.to(device)
 
     param_optimizer = list(model_stage_2.named_parameters())
