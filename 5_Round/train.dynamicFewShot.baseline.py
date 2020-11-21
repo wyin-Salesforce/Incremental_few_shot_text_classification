@@ -107,8 +107,7 @@ class ModelStageTwo(nn.Module):
         # self.roberta_single= RobertaModel.from_pretrained(pretrain_model_dir)
         # self.roberta_single.load_state_dict(torch.load('/export/home/Dataset/BERT_pretrained_mine/MNLI_pretrained/_acc_0.9040886899918633.pt'), strict=False)
         # self.single_hidden2tag = RobertaClassificationHead(bert_hidden_dim, tagset_size)
-        self.MLP_query = MLP(bert_hidden_dim)
-        self.MLP_base = MLP(bert_hidden_dim)
+        # self.MLP = MLP(bert_hidden_dim)
         # self.classWeight = Parameter(torch.Tensor(tagset_size, bert_hidden_dim))
         self.phi_avg = Parameter(torch.Tensor(1, bert_hidden_dim))
         self.phi_att = Parameter(torch.Tensor(1, bert_hidden_dim))
@@ -129,28 +128,29 @@ class ModelStageTwo(nn.Module):
         '''rep for a query batch'''
         normalized_input = hidden_states_single_v2/(1e-8+torch.sqrt(torch.sum(torch.square(hidden_states_single_v2), axis=1, keepdim=True)))
         '''now, build class weights'''
-        init_weight_for_all = self.MLP_base(roberta_model.classWeight[base_class_mapping]) if base_class_mapping is not None else self.MLP_base(roberta_model.classWeight) #the original order changed
+        init_weight_for_all = roberta_model.classWeight[base_class_mapping] if base_class_mapping is not None else roberta_model.classWeight #the original order changed
         init_normalized_weight_for_all = init_weight_for_all/(1e-8+torch.sqrt(torch.sum(torch.square(init_weight_for_all), axis=1, keepdim=True)))
 
         '''the input are support examples for a fake novel class'''
-        new_base_class_reps = init_weight_for_all[:-fake_novel_size] if fake_novel_size is not None else init_weight_for_all #(#base, hidden)
-        new_base_class_normalized_reps = init_normalized_weight_for_all[:-fake_novel_size] if fake_novel_size is not None else init_normalized_weight_for_all #(#base, hidden)
-        new_novel_normalized_class_reps = []
+        new_base_class_reps = init_normalized_weight_for_all[:-fake_novel_size] if fake_novel_size is not None else init_normalized_weight_for_all #(#base, hidden)
+        new_novel_class_reps = []
         for supports_rep_per_class in novel_class_support_reps:
             '''supports_rep_per_class is normalized in roberta output already'''
-            attention_matrix = nn.Softmax(dim=1)(self.MLP_query(supports_rep_per_class).matmul(new_base_class_reps.t())) #support, #base
+            attention_matrix = nn.Softmax(dim=1)(supports_rep_per_class.matmul(new_base_class_reps.t())) #support, #base
             attention_context = attention_matrix.matmul(new_base_class_reps) #supprt, hidden
             w_att = torch.mean(attention_context, axis=0, keepdim=True)
             w_avg = torch.mean(supports_rep_per_class, axis=0, keepdim=True)#prototype rep
             composed_rep_for_novel_class = self.phi_avg*w_avg + self.phi_att*w_att
             normalized_composed_rep_for_novel_class = composed_rep_for_novel_class/(1e-8+torch.sqrt(torch.sum(torch.square(composed_rep_for_novel_class), axis=1, keepdim=True)))
-            new_novel_normalized_class_reps.append(normalized_composed_rep_for_novel_class)
+            new_novel_class_reps.append(normalized_composed_rep_for_novel_class)
         if fake_novel_size is not None:
-            assert len(new_novel_normalized_class_reps) == fake_novel_size
-        update_normalized_weight_for_all = torch.cat([new_base_class_normalized_reps]+new_novel_normalized_class_reps, axis=0) #(10, hidden)
+            assert len(new_novel_class_reps) == fake_novel_size
+        update_normalized_weight_for_all = torch.cat([new_base_class_reps]+new_novel_class_reps, axis=0) #(10, hidden)
         '''compute logits for the query batch'''
         score_single =  normalized_input.matmul(update_normalized_weight_for_all.t()) #cosine
         return score_single
+
+
 
 class MLP(nn.Module):
     """wenpeng overwrite it so to accept matrix as input"""
@@ -725,7 +725,7 @@ def main():
     mean_loss = 0.0
     count =0
     best_threshold = 0.0
-    for _ in trange(int(args.num_train_epochs), desc="Stage2Epoch"):
+    for _ in trange(int(args.num_train_epochs)*3, desc="Stage2Epoch"):
         '''first, select some base classes as fake novel classes'''
         fake_novel_size = 5
         fake_novel_support_size = 5
