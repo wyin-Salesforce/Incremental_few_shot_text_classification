@@ -323,7 +323,7 @@ class RteProcessor(DataProcessor):
 
         return class_2_examples, find_class_list
 
-    def load_dev_or_test(self, round_list, find_class_list, flag):
+    def load_dev_or_test(self, round_list, flag):
         '''
         find_class_list: classes in training, i.e., seen classes
         '''
@@ -336,13 +336,13 @@ class RteProcessor(DataProcessor):
                 parts = row.strip().split('\t')
                 assert len(parts)==2
                 class_name = parts[0].strip()
-                if class_name not in set(find_class_list):
-                    find_class_list.append(class_name)
+                # if class_name not in set(find_class_list):
+                #     find_class_list.append(class_name)
                 example_str = parts[1].strip()
                 examples.append(
                     InputExample(guid='eval', text_a=example_str, text_b=None, label=class_name))
             readfile.close()
-        return examples, find_class_list
+        return examples
 
 
 
@@ -822,7 +822,8 @@ def main():
     print('len(seen_class_list):', len(seen_class_list))
     assert len(novel_class_support_reps)+len(base_class_list) ==  len(seen_class_list)
     print('Extracting support reps for all  novel is over.')
-    test_examples, test_class_list = processor.load_dev_or_test(round_list, seen_class_list, 'test')
+    test_examples = processor.load_dev_or_test(round_list, 'test')
+    test_class_list = seen_class_list+list(ood_class_set)
     print('test_class_list:', test_class_list)
     test_split_list = []
     for test_class_i in test_class_list:
