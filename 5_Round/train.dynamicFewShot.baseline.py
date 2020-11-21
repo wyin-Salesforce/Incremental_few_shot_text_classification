@@ -119,7 +119,7 @@ class ModelStageTwo(nn.Module):
         nn.init.kaiming_uniform_(self.phi_att, a=math.sqrt(5))
 
         #(input_ids, input_mask, model, novel_class_support_reps= novel_class_support_reps, base_class_mapping = original_base_class_idlist)
-    def forward(self, input_ids, input_mask, roberta_model, novel_class_support_reps=None, base_class_mapping=None):
+    def forward(self, input_ids, input_mask, roberta_model, novel_class_support_reps=None, fake_novel_size=None, base_class_mapping=None):
 
         outputs_single = roberta_model.roberta_single(input_ids, input_mask, None)
         hidden_states_single = outputs_single[1]#torch.tanh(self.hidden_layer_2(torch.tanh(self.hidden_layer_1(outputs_single[1])))) #(batch, hidden)
@@ -745,7 +745,7 @@ def main():
             input_ids, input_mask, segment_ids, label_ids = batch
 
 
-            logits = model_stage_2(input_ids, input_mask, model, novel_class_support_reps= novel_class_support_reps, base_class_mapping = original_base_class_idlist)
+            logits = model_stage_2(input_ids, input_mask, model, novel_class_support_reps= novel_class_support_reps, fake_novel_size=fake_novel_size, base_class_mapping = original_base_class_idlist)
             loss_fct = CrossEntropyLoss()
 
             loss = loss_fct(logits.view(-1, num_labels), label_ids.view(-1))
