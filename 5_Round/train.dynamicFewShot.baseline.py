@@ -107,7 +107,8 @@ class ModelStageTwo(nn.Module):
         # self.roberta_single= RobertaModel.from_pretrained(pretrain_model_dir)
         # self.roberta_single.load_state_dict(torch.load('/export/home/Dataset/BERT_pretrained_mine/MNLI_pretrained/_acc_0.9040886899918633.pt'), strict=False)
         # self.single_hidden2tag = RobertaClassificationHead(bert_hidden_dim, tagset_size)
-        # self.MLP = MLP(bert_hidden_dim)
+        self.MLP_query = MLP(bert_hidden_dim)
+        self.MLP_base = MLP(bert_hidden_dim)
         # self.classWeight = Parameter(torch.Tensor(tagset_size, bert_hidden_dim))
         self.phi_avg = Parameter(torch.Tensor(1, bert_hidden_dim))
         self.phi_att = Parameter(torch.Tensor(1, bert_hidden_dim))
@@ -128,49 +129,28 @@ class ModelStageTwo(nn.Module):
         '''rep for a query batch'''
         normalized_input = hidden_states_single_v2/(1e-8+torch.sqrt(torch.sum(torch.square(hidden_states_single_v2), axis=1, keepdim=True)))
         '''now, build class weights'''
-        init_weight_for_all = roberta_model.classWeight[base_class_mapping] if base_class_mapping is not None else roberta_model.classWeight #the original order changed
+        init_weight_for_all = self.MLP_base(roberta_model.classWeight[base_class_mapping]) if base_class_mapping is not None else self.MLP_base(roberta_model.classWeight) #the original order changed
         init_normalized_weight_for_all = init_weight_for_all/(1e-8+torch.sqrt(torch.sum(torch.square(init_weight_for_all), axis=1, keepdim=True)))
 
         '''the input are support examples for a fake novel class'''
-        new_base_class_reps = init_normalized_weight_for_all[:-fake_novel_size] if fake_novel_size is not None else init_normalized_weight_for_all #(#base, hidden)
-        new_novel_class_reps = []
+        new_base_class_reps = init_weight_for_all[:-fake_novel_size] if fake_novel_size is not None else init_weight_for_all #(#base, hidden)
+        new_base_class_normalized_reps = init_normalized_weight_for_all[:-fake_novel_size] if fake_novel_size is not None else init_normalized_weight_for_all #(#base, hidden)
+        new_novel_normalized_class_reps = []
         for supports_rep_per_class in novel_class_support_reps:
             '''supports_rep_per_class is normalized in roberta output already'''
-            attention_matrix = nn.Softmax(dim=1)(supports_rep_per_class.matmul(new_base_class_reps.t())) #support, #base
+            attention_matrix = nn.Softmax(dim=1)(self.MLP_query(supports_rep_per_class).matmul(new_base_class_reps.t())) #support, #base
             attention_context = attention_matrix.matmul(new_base_class_reps) #supprt, hidden
             w_att = torch.mean(attention_context, axis=0, keepdim=True)
             w_avg = torch.mean(supports_rep_per_class, axis=0, keepdim=True)#prototype rep
             composed_rep_for_novel_class = self.phi_avg*w_avg + self.phi_att*w_att
             normalized_composed_rep_for_novel_class = composed_rep_for_novel_class/(1e-8+torch.sqrt(torch.sum(torch.square(composed_rep_for_novel_class), axis=1, keepdim=True)))
-            new_novel_class_reps.append(normalized_composed_rep_for_novel_class)
+            new_novel_normalized_class_reps.append(normalized_composed_rep_for_novel_class)
         if fake_novel_size is not None:
-            assert len(new_novel_class_reps) == fake_novel_size
-        update_normalized_weight_for_all = torch.cat([new_base_class_reps]+new_novel_class_reps, axis=0) #(10, hidden)
+            assert len(new_novel_normalized_class_reps) == fake_novel_size
+        update_normalized_weight_for_all = torch.cat([new_base_class_normalized_reps]+new_novel_normalized_class_reps, axis=0) #(10, hidden)
         '''compute logits for the query batch'''
         score_single =  normalized_input.matmul(update_normalized_weight_for_all.t()) #cosine
         return score_single
-
-class CosineLinear(nn.Module):
-
-    def __init__(self, in_features, out_features):
-        super(CosineLinear, self).__init__()
-        self.weight = Parameter(torch.Tensor(out_features, in_features))
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
-
-
-    def forward(self, input):
-        '''
-        input: (batch, hidden)
-        self.weight: (#class, hidden)
-        '''
-        # return F.linear(input, self.weight, self.bias)
-        normalized_input = input/(1e-8+torch.sqrt(torch.sum(torch.square(input), axis=1, keepdim=True)))
-        normalized_weight = self.weight/(1e-8+torch.sqrt(torch.sum(torch.square(self.weight), axis=1, keepdim=True)))
-        return normalized_input.matmul(normalized_weight.t()) #cosine
-
 
 class MLP(nn.Module):
     """wenpeng overwrite it so to accept matrix as input"""
@@ -179,9 +159,6 @@ class MLP(nn.Module):
         super(MLP, self).__init__()
         self.dense = nn.Linear(bert_hidden_dim, bert_hidden_dim)
         self.dropout = nn.Dropout(0.1)
-        # self.out_proj = nn.Linear(bert_hidden_dim, num_labels)
-        # self.out_proj = CosineLinear(bert_hidden_dim, num_labels)
-
     def forward(self, features):
         x = features#[:, 0, :]  # take <s> token (equiv. to [CLS])
         x = self.dropout(x)
