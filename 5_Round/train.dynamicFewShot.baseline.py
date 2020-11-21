@@ -823,6 +823,7 @@ def main():
     assert len(novel_class_support_reps)+len(base_class_list) ==  len(seen_class_list)
     print('Extracting support reps for all  novel is over.')
     test_examples, test_class_list = processor.load_dev_or_test(round_list, seen_class_list, 'test')
+    print('test_class_list:', test_class_list)
     test_split_list = []
     for test_class_i in test_class_list:
         test_split_list.append(class_2_split.get(test_class_i))
