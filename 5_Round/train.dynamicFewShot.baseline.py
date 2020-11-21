@@ -853,7 +853,7 @@ def main():
 
     pred_label_ids = []
     for i, pred_max_prob_i in enumerate(pred_max_prob):
-        if pred_max_prob_i < 0.5:
+        if pred_max_prob_i < 0.85:
             pred_label_ids.append(seen_class_list_size) #seen_class_list_size means ood
         else:
             pred_label_ids.append(pred_label_ids_raw[i])
