@@ -707,8 +707,8 @@ def main():
             optimizer.zero_grad()
             mean_loss+=loss.item()
             count+=1
-            if count % 50 == 0:
-                print('mean loss:', mean_loss/count)
+            # if count % 50 == 0:
+            #     print('mean loss:', mean_loss/count)
     print('stage 1, train supervised classification on base is over.')
     '''now, train the second stage'''
     model_stage_2 = ModelStageTwo()
@@ -725,7 +725,7 @@ def main():
     mean_loss = 0.0
     count =0
     best_threshold = 0.0
-    for _ in trange(int(args.num_train_epochs)*3, desc="Stage2Epoch"):
+    for _ in trange(int(args.num_train_epochs), desc="Stage2Epoch"):
         '''first, select some base classes as fake novel classes'''
         fake_novel_size = 5
         fake_novel_support_size = 5
@@ -752,26 +752,27 @@ def main():
         '''retrain on query set to optimize the weight generator'''
         train_dataloader = examples_to_features(train_examples, shuffled_base_class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='random')
         best_threshold_list = []
-        for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
-            model_stage_2.train()
-            batch = tuple(t.to(device) for t in batch)
-            input_ids, input_mask, segment_ids, label_ids = batch
+        for _ in range(10):
+            for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
+                model_stage_2.train()
+                batch = tuple(t.to(device) for t in batch)
+                input_ids, input_mask, segment_ids, label_ids = batch
 
 
-            logits = model_stage_2(input_ids, input_mask, model, novel_class_support_reps= novel_class_support_reps, fake_novel_size=fake_novel_size, base_class_mapping = original_base_class_idlist)
-            # print('logits:', logits)
-            loss_fct = CrossEntropyLoss()
+                logits = model_stage_2(input_ids, input_mask, model, novel_class_support_reps= novel_class_support_reps, fake_novel_size=fake_novel_size, base_class_mapping = original_base_class_idlist)
+                # print('logits:', logits)
+                loss_fct = CrossEntropyLoss()
 
-            loss = loss_fct(logits.view(-1, len(base_class_list)), label_ids.view(-1))
-            loss.backward()
-            optimizer_stage_2.step()
-            optimizer_stage_2.zero_grad()
-            mean_loss+=loss.item()
-            count+=1
-            if count % 50 == 0:
-                print('mean loss:', mean_loss/count)
-            scores_for_positive = logits[torch.arange(logits.shape[0]), label_ids.view(-1)].mean()
-            best_threshold_list.append(scores_for_positive.item())
+                loss = loss_fct(logits.view(-1, len(base_class_list)), label_ids.view(-1))
+                loss.backward()
+                optimizer_stage_2.step()
+                optimizer_stage_2.zero_grad()
+                mean_loss+=loss.item()
+                count+=1
+                if count % 50 == 0:
+                    print('mean loss:', mean_loss/count)
+                scores_for_positive = logits[torch.arange(logits.shape[0]), label_ids.view(-1)].mean()
+                best_threshold_list.append(scores_for_positive.item())
 
         best_threshold = sum(best_threshold_list) / len(best_threshold_list)
 
@@ -827,7 +828,7 @@ def main():
         model_stage_2.eval()
         with torch.no_grad():
             logits = model_stage_2(input_ids, input_mask, model, novel_class_support_reps= novel_class_support_reps, fake_novel_size=None, base_class_mapping = None)
-        print('test logits:', logits)
+        # print('test logits:', logits)
         if len(preds) == 0:
             preds.append(logits.detach().cpu().numpy())
         else:
