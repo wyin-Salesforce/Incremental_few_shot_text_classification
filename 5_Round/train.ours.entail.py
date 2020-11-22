@@ -657,7 +657,7 @@ def main():
                 '''compute loss decay'''
                 if round !='base':
                     '''fake pos'''
-                    decay=0.6
+                    decay=0.4
                     # print('cosine_matrix:', cosine_matrix)
                     # print('train_pair_type_ids:', train_pair_type_ids)
                     col_indices_regPos = (train_pair_type_ids==train_type_list.index('regPos')).nonzero(as_tuple=False).view(-1)
@@ -692,7 +692,7 @@ def main():
                 loss_fct = CrossEntropyLoss(reduction='none')
                 raw_loss_vec = loss_fct(logits.view(-1, 3), label_ids.view(-1))
                 if round !='base':
-                    raw_loss_vec = raw_loss_vec*decay_vec_fakePos*decay_vec_fakeNeg
+                    raw_loss_vec = raw_loss_vec*decay_vec_fakePos#*decay_vec_fakeNeg
 
                 loss = raw_loss_vec.mean()
                 loss.backward()
