@@ -139,7 +139,7 @@ class ModelStageTwo(nn.Module):
             attention_context = attention_matrix.matmul(new_base_class_reps) #supprt, hidden
             w_att = torch.mean(attention_context, axis=0, keepdim=True)
             w_avg = torch.mean(supports_rep_per_class, axis=0, keepdim=True)#prototype rep
-            composed_rep_for_novel_class = self.phi_avg*w_avg + self.phi_att*w_att
+            composed_rep_for_novel_class = self.phi_avg*w_avg #+ self.phi_att*w_att
             normalized_composed_rep_for_novel_class = composed_rep_for_novel_class/(1e-8+torch.sqrt(torch.sum(torch.square(composed_rep_for_novel_class), axis=1, keepdim=True)))
             new_novel_class_reps.append(normalized_composed_rep_for_novel_class)
         if fake_novel_size is not None:
