@@ -115,13 +115,10 @@ class ModelStageTwo(nn.Module):
     def reset_parameters(self, roberta_model):
         nn.init.kaiming_uniform_(self.phi_avg, a=math.sqrt(5))
         nn.init.kaiming_uniform_(self.phi_att, a=math.sqrt(5))
-        # self.classWeight = roberta_model.classWeight
+        self.classWeight = roberta_model.classWeight # it works
 
         #(input_ids, input_mask, model, novel_class_support_reps= novel_class_support_reps, base_class_mapping = original_base_class_idlist)
     def forward(self, input_ids, input_mask, roberta_model, novel_class_support_reps=None, fake_novel_size=None, base_class_mapping=None):
-
-        print('self.classWeight:', self.classWeight)
-        exit(0)
         '''rep for a query batch'''
         normalized_input = roberta_model(input_ids, input_mask, output_rep=True)#hidden_states_single_v2/(1e-8+torch.sqrt(torch.sum(torch.square(hidden_states_single_v2), axis=1, keepdim=True)))
         '''now, build class weights'''
