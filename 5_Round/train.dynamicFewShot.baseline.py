@@ -730,7 +730,7 @@ def main():
         fake_novel_support_size = 5
         '''for convenience, we keep shuffle the base classes, select the last 5 as fake novel'''
         original_base_class_idlist = list(range(len(base_class_list)))
-        random.shuffle(original_base_class_idlist)
+        # random.shuffle(original_base_class_idlist)
         shuffled_base_class_list = [ base_class_list[idd]  for idd in original_base_class_idlist]
         fake_novel_classlist = shuffled_base_class_list[-fake_novel_size:]
         '''load their support examples'''
