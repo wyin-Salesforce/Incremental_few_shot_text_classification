@@ -655,11 +655,11 @@ def main():
                 logits, cosine_matrix = model(input_ids, input_mask)
                 '''compute loss decay'''
                 '''fake pos'''
-                col_indices_regPos = (train_pair_type_ids==train_type_list.index('regPos')).nonzero().view(-1)
+                col_indices_regPos = (train_pair_type_ids==train_type_list.index('regPos')).nonzero(as_tuple=False).view(-1)
                 decay_vec_fakePos = torch.mean(cosine_matrix[:,col_indices_regPos],axis=1) #batch
                 decay_vec_fakePos[train_pair_type_ids!=train_type_list.index('fakePos')]=1.0
                 '''fake neg'''
-                col_indices_regNeg = (train_pair_type_ids==train_type_list.index('regNeg')).nonzero().view(-1)
+                col_indices_regNeg = (train_pair_type_ids==train_type_list.index('regNeg')).nonzero(as_tuple=False).view(-1)
                 decay_vec_fakeNeg = torch.mean(cosine_matrix[:,col_indices_regNeg],axis=1) #batch
                 decay_vec_fakeNeg[train_pair_type_ids!=train_type_list.index('fakeNeg')]=1.0
 
