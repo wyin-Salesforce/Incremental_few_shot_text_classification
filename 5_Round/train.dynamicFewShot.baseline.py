@@ -104,6 +104,8 @@ class RobertaForSequenceClassification(nn.Module):
 class ModelStageTwo(nn.Module):
     def __init__(self):
         super(ModelStageTwo, self).__init__()
+        self.query_para = nn.Linear(bert_hidden_dim, bert_hidden_dim)
+        self.key_para = nn.Linear(bert_hidden_dim, bert_hidden_dim)
         self.phi_avg = Parameter(torch.Tensor(1, bert_hidden_dim))
         self.phi_att = Parameter(torch.Tensor(1, bert_hidden_dim))
         self.reset_parameters()
@@ -130,7 +132,9 @@ class ModelStageTwo(nn.Module):
         new_novel_class_reps = []
         for supports_rep_per_class in novel_class_support_reps:
             '''supports_rep_per_class is normalized in roberta output already'''
-            attention_matrix = nn.Softmax(dim=1)(supports_rep_per_class.matmul(new_base_class_reps.t())) #support, #base
+            supports_rep_per_class_as_query = self.query_para(supports_rep_per_class)
+            new_base_class_reps_as_key = self.key_para(new_base_class_reps)
+            attention_matrix = nn.Softmax(dim=1)(supports_rep_per_class_as_query.matmul(new_base_class_reps_as_key.t())) #support, #base
             attention_context = attention_matrix.matmul(new_base_class_reps) #supprt, hidden
             w_att = torch.mean(attention_context, axis=0, keepdim=True)
             w_avg = torch.mean(supports_rep_per_class, axis=0, keepdim=True)#prototype rep
@@ -715,7 +719,7 @@ def main():
         {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
         ]
     optimizer_stage_2 = AdamW(optimizer_grouped_parameters,
-                             lr=1e-8)
+                             lr=args.learning_rate)
     mean_loss = 0.0
     count =0
     best_threshold = 0.0
@@ -744,7 +748,7 @@ def main():
         assert len(novel_class_support_reps) == fake_novel_size
         print('Extracting support reps for fake novel is over.')
         '''retrain on query set to optimize the weight generator'''
-        train_dataloader = examples_to_features(train_examples, shuffled_base_class_list, args, tokenizer, args.train_batch_size*3, "classification", dataloader_mode='random')
+        train_dataloader = examples_to_features(train_examples, shuffled_base_class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='random')
         best_threshold_list = []
         for _ in range(10):
             for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
