@@ -751,7 +751,7 @@ def main():
         '''retrain on query set to optimize the weight generator'''
         train_dataloader = examples_to_features(train_examples, shuffled_base_class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='random')
         best_threshold_list = []
-        for _ in range(10):
+        for _ in range(10): #repeat 10 times is important
             for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
                 model_stage_2.train()
                 batch = tuple(t.to(device) for t in batch)
