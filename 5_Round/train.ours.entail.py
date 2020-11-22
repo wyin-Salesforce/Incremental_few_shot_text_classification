@@ -214,7 +214,7 @@ class RteProcessor(DataProcessor):
                     for preceding_class in preceding_class_set:
                         class_str = ' '.join(preceding_class.split('_'))
                         examples_this_round.append( InputExample(guid=round, text_a=example_str, text_b=class_str, label='entailment', premise_class=class_name, training_pair_type='fakePos'))
-                        # examples_this_round.append( InputExample(guid=round, text_a=example_str, text_b=class_str, label='non-entailment', premise_class=class_name, training_pair_type='fakeNeg'))
+                        examples_this_round.append( InputExample(guid=round, text_a=example_str, text_b=class_str, label='non-entailment', premise_class=class_name, training_pair_type='fakeNeg'))
 
             readfile.close()
             examples_list.append(examples_this_round)
@@ -657,6 +657,7 @@ def main():
                 '''compute loss decay'''
                 if round !='base':
                     '''fake pos'''
+                    print('cosine_matrix:', cosine_matrix)
                     print('train_pair_type_ids:', train_pair_type_ids)
                     col_indices_regPos = (train_pair_type_ids==train_type_list.index('regPos')).nonzero(as_tuple=False).view(-1)
                     decay_vec_fakePos = torch.mean(cosine_matrix[:,col_indices_regPos],axis=1) #batch
@@ -672,7 +673,7 @@ def main():
                 loss_fct = CrossEntropyLoss(reduction='none')
                 raw_loss_vec = loss_fct(logits.view(-1, 3), label_ids.view(-1))
                 if round !='base':
-                    raw_loss_vec = raw_loss_vec*decay_vec_fakePos#*decay_vec_fakeNeg
+                    raw_loss_vec = raw_loss_vec*decay_vec_fakePos*decay_vec_fakeNeg
 
                 loss = raw_loss_vec.mean()
                 loss.backward()
