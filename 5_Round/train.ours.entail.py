@@ -664,7 +664,7 @@ def main():
                 decay_vec_fakeNeg[train_pair_type_ids!=train_type_list.index('fakeNeg')]=1.0
 
 
-                loss_fct = CrossEntropyLoss(reduce=False)
+                loss_fct = CrossEntropyLoss(reduction='none')
                 raw_loss_vec = loss_fct(logits.view(-1, 3), label_ids.view(-1))
                 raw_loss_vec = raw_loss_vec*decay_vec_fakePos*decay_vec_fakeNeg
                 loss = raw_loss_vec.mean()
@@ -682,7 +682,7 @@ def main():
     preds = []
     gold_class_ids = []
     for _, batch in enumerate(tqdm(test_dataloader, desc="test")):
-        input_ids, input_mask, segment_ids, label_ids, premise_class_ids = batch
+        input_ids, input_mask, segment_ids, label_ids, premise_class_ids, _ = batch
         input_ids = input_ids.to(device)
         input_mask = input_mask.to(device)
         gold_class_ids+=list(premise_class_ids.detach().cpu().numpy())
@@ -760,7 +760,7 @@ if __name__ == "__main__":
 
 '''
 
-CUDA_VISIBLE_DEVICES=7 python -u train.entailment.baseline.py --task_name rte --do_train --do_lower_case --num_train_epochs 5 --train_batch_size 16 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 64 --seed 42 --round_name 'r1'
+CUDA_VISIBLE_DEVICES=7 python -u train.ours.entail.py --task_name rte --do_train --do_lower_case --num_train_epochs 5 --train_batch_size 16 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 64 --seed 42 --round_name 'r1'
 
 
 '''
