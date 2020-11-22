@@ -665,8 +665,8 @@ def main():
                         decay_vec_fakePos = torch.mean(exacted_cosine_part,axis=1) #batch
                         decay_vec_fakePos[train_pair_type_ids!=train_type_list.index('fakePos')]=1.0
                     else:
-                        decay_vec_fakePos=torch.tensor([0.1]*input_ids.shape[0])
-                        decay_vec_fakePos.to(device)
+                        decay_vec_fakePos=torch.tensor([0.1]*input_ids.shape[0]).to(device)
+                        # decay_vec_fakePos.to(device)
                         decay_vec_fakePos[train_pair_type_ids!=train_type_list.index('fakePos')]=1.0
 
 
@@ -678,8 +678,8 @@ def main():
                         decay_vec_fakeNeg = torch.mean(exacted_cosine_part,axis=1) #batch
                         decay_vec_fakeNeg[train_pair_type_ids!=train_type_list.index('fakeNeg')]=1.0
                     else:
-                        decay_vec_fakeNeg=torch.tensor([0.1]*input_ids.shape[0])
-                        decay_vec_fakeNeg.to(device)
+                        decay_vec_fakeNeg=torch.tensor([0.1]*input_ids.shape[0]).to(device)
+                        # decay_vec_fakeNeg.to(device)
                         decay_vec_fakeNeg[train_pair_type_ids!=train_type_list.index('fakeNeg')]=1.0
 
 
