@@ -108,6 +108,7 @@ class ModelStageTwo(nn.Module):
         self.key_para = nn.Linear(bert_hidden_dim, bert_hidden_dim)
         self.phi_avg = Parameter(torch.Tensor(1, bert_hidden_dim))
         self.phi_att = Parameter(torch.Tensor(1, bert_hidden_dim))
+        self.γ = Parameter(torch.Tensor(1))
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -133,8 +134,11 @@ class ModelStageTwo(nn.Module):
         for supports_rep_per_class in novel_class_support_reps:
             '''supports_rep_per_class is normalized in roberta output already'''
             supports_rep_per_class_as_query = self.query_para(supports_rep_per_class)
+            supports_rep_per_class_as_query = supports_rep_per_class_as_query/(1e-8+torch.sqrt(torch.sum(torch.square(supports_rep_per_class_as_query), axis=1, keepdim=True)))
             new_base_class_reps_as_key = self.key_para(new_base_class_reps)
-            attention_matrix = nn.Softmax(dim=1)(supports_rep_per_class_as_query.matmul(new_base_class_reps_as_key.t())) #support, #base
+            new_base_class_reps_as_key = new_base_class_reps_as_key/(1e-8+torch.sqrt(torch.sum(torch.square(new_base_class_reps_as_key), axis=1, keepdim=True)))
+            '''cosine(query, key)'''
+            attention_matrix = nn.Softmax(dim=1)(self.γ*(supports_rep_per_class_as_query.matmul(new_base_class_reps_as_key.t()))) #support, #base
             attention_context = attention_matrix.matmul(new_base_class_reps) #supprt, hidden
             w_att = torch.mean(attention_context, axis=0, keepdim=True)
             w_avg = torch.mean(supports_rep_per_class, axis=0, keepdim=True)#prototype rep
