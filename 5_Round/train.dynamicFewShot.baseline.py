@@ -726,7 +726,7 @@ def main():
     best_threshold = 0.0
     for _ in trange(int(args.num_train_epochs), desc="Stage2Epoch"):
         '''first, select some base classes as fake novel classes'''
-        fake_novel_size = 5
+        fake_novel_size = 15
         fake_novel_support_size = 5
         '''for convenience, we keep shuffle the base classes, select the last 5 as fake novel'''
         original_base_class_idlist = list(range(len(base_class_list)))
