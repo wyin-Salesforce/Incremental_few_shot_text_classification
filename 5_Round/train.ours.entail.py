@@ -658,7 +658,7 @@ def main():
                 '''compute loss decay'''
                 if round !='base':
                     '''fake pos'''
-                    decay=0.6
+                    decay=0.5
                     # print('cosine_matrix:', cosine_matrix)
                     # print('train_pair_type_ids:', train_pair_type_ids)
                     col_indices_regPos = (train_pair_type_ids==train_type_list.index('regPos')).nonzero(as_tuple=False).view(-1)
