@@ -211,10 +211,11 @@ class RteProcessor(DataProcessor):
                 '''reminding pairs'''
                 if round !='base':
                     preceding_class_set = set(class_list_up_to_now)-class_set_in_this_round
-                    for preceding_class in preceding_class_set:
-                        class_str = ' '.join(preceding_class.split('_'))
-                        examples_this_round.append( InputExample(guid=round, text_a=example_str, text_b=class_str, label='entailment', premise_class=class_name, training_pair_type='fakePos'))
-                        # examples_this_round.append( InputExample(guid=round, text_a=example_str, text_b=class_str, label='non-entailment', premise_class=class_name, training_pair_type='fakeNeg'))
+                    # for preceding_class in preceding_class_set:
+                    preceding_class = random.sample(list(preceding_class_set), 1)[0]
+                    class_str = ' '.join(preceding_class.split('_'))
+                    examples_this_round.append( InputExample(guid=round, text_a=example_str, text_b=class_str, label='entailment', premise_class=class_name, training_pair_type='fakePos'))
+                    # examples_this_round.append( InputExample(guid=round, text_a=example_str, text_b=class_str, label='non-entailment', premise_class=class_name, training_pair_type='fakeNeg'))
 
             readfile.close()
             examples_list.append(examples_this_round)
@@ -657,7 +658,7 @@ def main():
                 '''compute loss decay'''
                 if round !='base':
                     '''fake pos'''
-                    decay=0.6
+                    decay=1.0
                     # print('cosine_matrix:', cosine_matrix)
                     # print('train_pair_type_ids:', train_pair_type_ids)
                     col_indices_regPos = (train_pair_type_ids==train_type_list.index('regPos')).nonzero(as_tuple=False).view(-1)
