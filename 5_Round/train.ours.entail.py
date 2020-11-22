@@ -657,10 +657,11 @@ def main():
                 '''compute loss decay'''
                 if round !='base':
                     '''fake pos'''
+                    decay=0.1
                     # print('cosine_matrix:', cosine_matrix)
                     # print('train_pair_type_ids:', train_pair_type_ids)
                     col_indices_regPos = (train_pair_type_ids==train_type_list.index('regPos')).nonzero(as_tuple=False).view(-1)
-                    exacted_cosine_part = cosine_matrix[:,col_indices_regPos]
+                    exacted_cosine_part = decay*cosine_matrix[:,col_indices_regPos]
                     if exacted_cosine_part.nelement() != 0:
                         decay_vec_fakePos = torch.mean(exacted_cosine_part,axis=1) #batch
                         decay_vec_fakePos[train_pair_type_ids!=train_type_list.index('fakePos')]=1.0
@@ -675,7 +676,7 @@ def main():
                     col_indices_regNeg = (train_pair_type_ids==train_type_list.index('regNeg')).nonzero(as_tuple=False).view(-1)
                     # print("train_type_list.index('regNeg'):", train_type_list.index('regNeg'))
 
-                    exacted_cosine_part = cosine_matrix[:,col_indices_regNeg]
+                    exacted_cosine_part = decay*cosine_matrix[:,col_indices_regNeg]
                     # print('exacted_cosine_part:', exacted_cosine_part)
                     # print('exacted_cosine_part.nelement():', exacted_cosine_part.nelement())
                     if exacted_cosine_part.nelement() != 0:
