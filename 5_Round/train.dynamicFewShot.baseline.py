@@ -104,29 +104,23 @@ class RobertaForSequenceClassification(nn.Module):
 class ModelStageTwo(nn.Module):
     def __init__(self):
         super(ModelStageTwo, self).__init__()
-        # self.roberta_single= RobertaModel.from_pretrained(pretrain_model_dir)
-        # self.roberta_single.load_state_dict(torch.load('/export/home/Dataset/BERT_pretrained_mine/MNLI_pretrained/_acc_0.9040886899918633.pt'), strict=False)
-        # self.single_hidden2tag = RobertaClassificationHead(bert_hidden_dim, tagset_size)
-        # self.MLP = MLP(bert_hidden_dim)
-        # self.classWeight = Parameter(torch.Tensor(tagset_size, bert_hidden_dim))
         self.phi_avg = Parameter(torch.Tensor(1, bert_hidden_dim))
         self.phi_att = Parameter(torch.Tensor(1, bert_hidden_dim))
         self.reset_parameters()
 
     def reset_parameters(self):
-        # nn.init.kaiming_uniform_(self.classWeight, a=math.sqrt(5))
         nn.init.kaiming_uniform_(self.phi_avg, a=math.sqrt(5))
         nn.init.kaiming_uniform_(self.phi_att, a=math.sqrt(5))
 
         #(input_ids, input_mask, model, novel_class_support_reps= novel_class_support_reps, base_class_mapping = original_base_class_idlist)
     def forward(self, input_ids, input_mask, roberta_model, novel_class_support_reps=None, fake_novel_size=None, base_class_mapping=None):
 
-        outputs_single = roberta_model.roberta_single(input_ids, input_mask, None)
-        hidden_states_single = outputs_single[1]#torch.tanh(self.hidden_layer_2(torch.tanh(self.hidden_layer_1(outputs_single[1])))) #(batch, hidden)
+        # outputs_single = roberta_model.roberta_single(input_ids, input_mask, None)
+        # hidden_states_single = outputs_single[1]#torch.tanh(self.hidden_layer_2(torch.tanh(self.hidden_layer_1(outputs_single[1])))) #(batch, hidden)
 
-        hidden_states_single_v2 = roberta_model.MLP(hidden_states_single) #(batch, tag_set)
+        # hidden_states_single_v2 = roberta_model.MLP(hidden_states_single) #(batch, tag_set)
         '''rep for a query batch'''
-        normalized_input = hidden_states_single_v2/(1e-8+torch.sqrt(torch.sum(torch.square(hidden_states_single_v2), axis=1, keepdim=True)))
+        normalized_input = roberta_model(input_ids, input_mask, output_rep=True)#hidden_states_single_v2/(1e-8+torch.sqrt(torch.sum(torch.square(hidden_states_single_v2), axis=1, keepdim=True)))
         '''now, build class weights'''
         init_weight_for_all = roberta_model.classWeight[base_class_mapping] if base_class_mapping is not None else roberta_model.classWeight #the original order changed
         init_normalized_weight_for_all = init_weight_for_all/(1e-8+torch.sqrt(torch.sum(torch.square(init_weight_for_all), axis=1, keepdim=True)))
@@ -721,7 +715,7 @@ def main():
         {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
         ]
     optimizer_stage_2 = AdamW(optimizer_grouped_parameters,
-                             lr=args.learning_rate)
+                             lr=1e-8)
     mean_loss = 0.0
     count =0
     best_threshold = 0.0
@@ -750,7 +744,7 @@ def main():
         assert len(novel_class_support_reps) == fake_novel_size
         print('Extracting support reps for fake novel is over.')
         '''retrain on query set to optimize the weight generator'''
-        train_dataloader = examples_to_features(train_examples, shuffled_base_class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='random')
+        train_dataloader = examples_to_features(train_examples, shuffled_base_class_list, args, tokenizer, args.train_batch_size*3, "classification", dataloader_mode='random')
         best_threshold_list = []
         for _ in range(10):
             for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
