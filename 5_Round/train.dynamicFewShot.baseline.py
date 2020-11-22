@@ -774,7 +774,7 @@ def main():
             best_threshold_list.append(scores_for_positive.item())
 
         best_threshold = sum(best_threshold_list) / len(best_threshold_list)
-    print('best_threshold:', best_threshold )
+
     print('stage 2 training over')
 
     '''
@@ -810,6 +810,7 @@ def main():
     test_examples = processor.load_dev_or_test(round_list, 'test')
     test_class_list = seen_class_list+list(ood_class_set)
     print('test_class_list:', len(test_class_list))
+    print('best_threshold:', best_threshold )
     test_split_list = []
     for test_class_i in test_class_list:
         test_split_list.append(class_2_split.get(test_class_i))
@@ -826,7 +827,7 @@ def main():
         model_stage_2.eval()
         with torch.no_grad():
             logits = model_stage_2(input_ids, input_mask, model, novel_class_support_reps= novel_class_support_reps, fake_novel_size=None, base_class_mapping = None)
-
+        print('test logits:', logits)
         if len(preds) == 0:
             preds.append(logits.detach().cpu().numpy())
         else:
