@@ -667,6 +667,7 @@ def main():
                     else:
                         decay_vec_fakePos=torch.tensor(input_ids.shape[0]).fill_(0.1)
                         decay_vec_fakePos.to(device)
+                        print('decay_vec_fakePos:', decay_vec_fakePos)
                         decay_vec_fakePos[train_pair_type_ids!=train_type_list.index('fakePos')]=1.0
 
 
