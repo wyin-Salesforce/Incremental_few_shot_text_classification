@@ -673,7 +673,11 @@ def main():
                     print('decay_vec_fakePos:', decay_vec_fakePos)
                     '''fake neg'''
                     col_indices_regNeg = (train_pair_type_ids==train_type_list.index('regNeg')).nonzero(as_tuple=False).view(-1)
+                    print("train_type_list.index('regNeg'):", train_type_list.index('regNeg'))
+
                     exacted_cosine_part = cosine_matrix[:,col_indices_regNeg]
+                    print('exacted_cosine_part:', exacted_cosine_part)
+                    print('exacted_cosine_part.nelement():', exacted_cosine_part.nelement())
                     if exacted_cosine_part.nelement() != 0:
                         decay_vec_fakeNeg = torch.mean(exacted_cosine_part,axis=1) #batch
                         decay_vec_fakeNeg[train_pair_type_ids!=train_type_list.index('fakeNeg')]=1.0
