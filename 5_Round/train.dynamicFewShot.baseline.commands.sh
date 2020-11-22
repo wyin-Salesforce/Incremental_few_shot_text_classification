@@ -1,6 +1,6 @@
 export BATCHSIZE=32
 export EPOCHSIZE=20
-export SEED=42 #42, 16, 32
+export SEED=16 #42, 16, 32
 export LEARNINGRATE=1e-6
 
 CUDA_VISIBLE_DEVICES=0 python -u train.dynamicFewShot.baseline.py \
