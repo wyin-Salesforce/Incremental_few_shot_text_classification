@@ -3,6 +3,8 @@ export EPOCHSIZE=20
 export SEED=32 #42, 16, 32
 export LEARNINGRATE=1e-6
 
+#running time, 90mins per seed
+
 CUDA_VISIBLE_DEVICES=0 python -u train.dynamicFewShot.baseline.py \
     --task_name rte \
     --do_train \

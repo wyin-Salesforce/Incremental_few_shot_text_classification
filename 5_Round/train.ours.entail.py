@@ -79,8 +79,8 @@ class RobertaForSequenceClassification(nn.Module):
         outputs_single = self.roberta_single(input_ids, input_mask, None)
         hidden_states_single = outputs_single[1]#torch.tanh(self.hidden_layer_2(torch.tanh(self.hidden_layer_1(outputs_single[1])))) #(batch, hidden)
 
-        score_single = self.single_hidden2tag(hidden_states_single) #(batch, tag_set)
-        return score_single
+        score_single, similarity_matrix = self.single_hidden2tag(hidden_states_single) #(batch, tag_set)
+        return score_single, similarity_matrix
 
 
 
@@ -98,16 +98,19 @@ class RobertaClassificationHead(nn.Module):
         x = self.dropout(x)
         x = self.dense(x)
         x = torch.tanh(x)
+        normalized_x = x/(1e-8+torch.sqrt(torch.sum(torch.square(x), axis=1, keepdim=True)))
+        '''similarity within minibatch'''
+        similarity_matrix = normalized_x.matmul(normalized_x.t()) #(batch, batch)
         x = self.dropout(x)
         x = self.out_proj(x)
-        return x
+        return x, similarity_matrix
 
 
 
 class InputExample(object):
     """A single training/test example for simple sequence classification."""
 
-    def __init__(self, guid, text_a, text_b=None, label=None, premise_class=None):
+    def __init__(self, guid, text_a, text_b=None, label=None, premise_class=None, training_pair_type=None):
         """Constructs a InputExample.
 
         Args:
@@ -124,17 +127,19 @@ class InputExample(object):
         self.text_b = text_b
         self.label = label
         self.premise_class = premise_class
+        self.training_pair_type = training_pair_type
 
 
 class InputFeatures(object):
     """A single set of features of data."""
 
-    def __init__(self, input_ids, input_mask, segment_ids, label_id, premise_class_id):
+    def __init__(self, input_ids, input_mask, segment_ids, label_id, premise_class_id, training_pair_type_id):
         self.input_ids = input_ids
         self.input_mask = input_mask
         self.segment_ids = segment_ids
         self.label_id = label_id
         self.premise_class_id = premise_class_id
+        self.training_pair_type_id = training_pair_type_id
 
 
 class DataProcessor(object):
@@ -187,21 +192,28 @@ class RteProcessor(DataProcessor):
                 class_str = ' '.join(class_name.split('_'))
                 example_str = parts[1].strip()
                 '''positive pair'''
-                examples_this_round.append( InputExample(guid=round, text_a=example_str, text_b=class_str, label='entailment', premise_class=class_name))
-                '''fake negative by shuffle the words in true class string'''
-                wordlist_in_class = class_name.split('_')
-                random.shuffle(wordlist_in_class)
-                examples_this_round.append( InputExample(guid=round, text_a=example_str, text_b=' '.join(wordlist_in_class), label='non-entailment', premise_class=class_name))
-                for i in range(5):
-                    new_premise_wordlist = example_str.split()
-                    random.shuffle(new_premise_wordlist)
-                    examples_this_round.append( InputExample(guid=round, text_a=' '.join(new_premise_wordlist), text_b=class_str, label='non-entailment', premise_class=class_name))
+                examples_this_round.append( InputExample(guid=round, text_a=example_str, text_b=class_str, label='entailment', premise_class=class_name, training_pair_type='regPos'))
+                # '''fake negative by shuffle the words in true class string'''
+                # wordlist_in_class = class_name.split('_')
+                # random.shuffle(wordlist_in_class)
+                # examples_this_round.append( InputExample(guid=round, text_a=example_str, text_b=' '.join(wordlist_in_class), label='non-entailment', premise_class=class_name))
+                # for i in range(5):
+                #     new_premise_wordlist = example_str.split()
+                #     random.shuffle(new_premise_wordlist)
+                #     examples_this_round.append( InputExample(guid=round, text_a=' '.join(new_premise_wordlist), text_b=class_str, label='non-entailment', premise_class=class_name))
 
                 '''negative pairs 就在本round里面找了'''
                 negative_class_set = set(class_set_in_this_round)-set([class_name])
                 for negative_class in negative_class_set:
                     class_str = ' '.join(negative_class.split('_'))
-                    examples_this_round.append( InputExample(guid=round, text_a=example_str, text_b=class_str, label='non-entailment', premise_class=class_name))
+                    examples_this_round.append( InputExample(guid=round, text_a=example_str, text_b=class_str, label='non-entailment', premise_class=class_name, training_pair_type='regNeg'))
+
+                '''reminding pairs'''
+                preceding_class_set = set(class_list_up_to_now)-class_set_in_this_round
+                for preceding_class in preceding_class_set:
+                    class_str = ' '.join(preceding_class.split('_'))
+                    examples_this_round.append( InputExample(guid=round, text_a=example_str, text_b=class_str, label='entailment', premise_class=class_name, training_pair_type='fakePos'))
+                    examples_this_round.append( InputExample(guid=round, text_a=example_str, text_b=class_str, label='non-entailment', premise_class=class_name, training_pair_type='fakeNeg'))
 
             readfile.close()
             examples_list.append(examples_this_round)
@@ -228,7 +240,7 @@ class RteProcessor(DataProcessor):
                     '''each example compares with all seen classes'''
                     class_str = ' '.join(seen_class.split('_'))
                     examples.append(
-                        InputExample(guid=flag, text_a=example_str, text_b=class_str, label='entailment', premise_class=class_name))
+                        InputExample(guid=flag, text_a=example_str, text_b=class_str, label='entailment', premise_class=class_name, training_pair_type='regPos'))
                 instance_size+=1
             readfile.close()
             examples_rounds+=examples
@@ -258,7 +270,7 @@ class RteProcessor(DataProcessor):
 
 
 
-def convert_examples_to_features(examples, label_list, eval_class_list, max_seq_length,
+def convert_examples_to_features(examples, label_list, eval_class_list, train_type_list, max_seq_length,
                                  tokenizer, output_mode,
                                  cls_token_at_end=False,
                                  cls_token='[CLS]',
@@ -280,6 +292,7 @@ def convert_examples_to_features(examples, label_list, eval_class_list, max_seq_
 
     label_map = {label : i for i, label in enumerate(label_list)}
     class_map = {label : i for i, label in enumerate(eval_class_list)}
+    train_type_map = {label : i for i, label in enumerate(train_type_list)}
 
     features = []
     for (ex_index, example) in enumerate(examples):
@@ -371,7 +384,8 @@ def convert_examples_to_features(examples, label_list, eval_class_list, max_seq_
                               input_mask=input_mask,
                               segment_ids=segment_ids,
                               label_id=label_id,
-                              premise_class_id = class_map[example.premise_class]))
+                              premise_class_id = class_map[example.premise_class],
+                              training_pair_type_id = train_type_map[example.training_pair_type]))
     return features
 
 def _truncate_seq_pair(tokens_a, tokens_b, max_length):
@@ -410,9 +424,9 @@ def load_class_names():
     return list(class_list), ood_classes, class_2_split
 
 
-def examples_to_features(source_examples, label_list, eval_class_list, args, tokenizer, batch_size, output_mode, dataloader_mode='sequential'):
+def examples_to_features(source_examples, label_list, eval_class_list, train_type_list, args, tokenizer, batch_size, output_mode, dataloader_mode='sequential'):
     source_features = convert_examples_to_features(
-        source_examples, label_list, eval_class_list, args.max_seq_length, tokenizer, output_mode,
+        source_examples, label_list, eval_class_list, train_type_list, args.max_seq_length, tokenizer, output_mode,
         cls_token_at_end=False,#bool(args.model_type in ['xlnet']),            # xlnet has a cls token at the end
         cls_token=tokenizer.cls_token,
         cls_token_segment_id=0,#2 if args.model_type in ['xlnet'] else 0,
@@ -427,8 +441,9 @@ def examples_to_features(source_examples, label_list, eval_class_list, args, tok
     dev_all_segment_ids = torch.tensor([f.segment_ids for f in source_features], dtype=torch.long)
     dev_all_label_ids = torch.tensor([f.label_id for f in source_features], dtype=torch.long)
     dev_all_premise_class_ids = torch.tensor([f.premise_class_id for f in source_features], dtype=torch.long)
+    dev_all_training_pair_type_ids = torch.tensor([f.training_pair_type_id for f in source_features], dtype=torch.long)
 
-    dev_data = TensorDataset(dev_all_input_ids, dev_all_input_mask, dev_all_segment_ids, dev_all_label_ids, dev_all_premise_class_ids)
+    dev_data = TensorDataset(dev_all_input_ids, dev_all_input_mask, dev_all_segment_ids, dev_all_label_ids, dev_all_premise_class_ids, dev_all_training_pair_type_ids)
     if dataloader_mode=='sequential':
         dev_sampler = SequentialSampler(dev_data)
     else:
@@ -615,14 +630,15 @@ def main():
     test_examples = processor.load_dev_or_test(round_list, train_class_list, 'test')
     print('train size:', [len(train_i) for train_i in train_examples_list], ' dev size:', len(dev_examples), ' test size:', len(test_examples))
     entail_class_list = ['entailment', 'non-entailment']
+    train_type_list = ['regPos', 'regNeg', 'fakePos', 'fakeNeg']
     eval_class_list = train_class_list+['ood']
     test_split_list = train_class_2_split_list+['ood']
     train_dataloader_list = []
     for train_examples in train_examples_list:
-        train_dataloader = examples_to_features(train_examples, entail_class_list, eval_class_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='random')
+        train_dataloader = examples_to_features(train_examples, entail_class_list, eval_class_list, train_type_list, args, tokenizer, args.train_batch_size, "classification", dataloader_mode='random')
         train_dataloader_list.append(train_dataloader)
-    dev_dataloader = examples_to_features(dev_examples, entail_class_list, eval_class_list, args, tokenizer, args.eval_batch_size, "classification", dataloader_mode='sequential')
-    test_dataloader = examples_to_features(test_examples, entail_class_list, eval_class_list, args, tokenizer, args.eval_batch_size, "classification", dataloader_mode='sequential')
+    dev_dataloader = examples_to_features(dev_examples, entail_class_list, eval_class_list, train_type_list, args, tokenizer, args.eval_batch_size, "classification", dataloader_mode='sequential')
+    test_dataloader = examples_to_features(test_examples, entail_class_list, eval_class_list, train_type_list, args, tokenizer, args.eval_batch_size, "classification", dataloader_mode='sequential')
 
     '''training'''
     max_test_acc = 0.0
@@ -634,11 +650,24 @@ def main():
             for _, batch in enumerate(tqdm(train_dataloader, desc="train|"+round+'|epoch_'+str(epoch_i))):
                 model.train()
                 batch = tuple(t.to(device) for t in batch)
-                input_ids, input_mask, _, label_ids, premise_class_ids = batch
+                input_ids, input_mask, _, label_ids, premise_class_ids, train_pair_type_ids = batch
 
-                logits = model(input_ids, input_mask)
-                loss_fct = CrossEntropyLoss()
-                loss = loss_fct(logits.view(-1, 3), label_ids.view(-1))
+                logits, cosine_matrix = model(input_ids, input_mask)
+                '''compute loss decay'''
+                '''fake pos'''
+                col_indices_regPos = (train_pair_type_ids==train_type_list.index('regPos')).nonzero().view(-1)
+                decay_vec_fakePos = torch.mean(cosine_matrix[:,col_indices_regPos],axis=1) #batch
+                decay_vec_fakePos[train_pair_type_ids!=train_type_list.index('fakePos')]=1.0
+                '''fake neg'''
+                col_indices_regNeg = (train_pair_type_ids==train_type_list.index('regNeg')).nonzero().view(-1)
+                decay_vec_fakeNeg = torch.mean(cosine_matrix[:,col_indices_regNeg],axis=1) #batch
+                decay_vec_fakeNeg[train_pair_type_ids!=train_type_list.index('fakeNeg')]=1.0
+
+
+                loss_fct = CrossEntropyLoss(reduce=False)
+                raw_loss_vec = loss_fct(logits.view(-1, 3), label_ids.view(-1))
+                raw_loss_vec = raw_loss_vec*decay_vec_fakePos*decay_vec_fakeNeg
+                loss = raw_loss_vec.mean()
                 loss.backward()
                 optimizer.step()
                 optimizer.zero_grad()
@@ -646,37 +675,36 @@ def main():
 
     '''evaluation'''
     model.eval()
-    '''dev'''
-    acc_each_round = []
+
+    logger.info("***** Running test *****")
+    logger.info("  Num examples = %d", len(test_examples))
+
     preds = []
     gold_class_ids = []
-    for _, batch in enumerate(tqdm(dev_dataloader, desc="dev")):
-        input_ids, input_mask, _, label_ids, premise_class_ids = batch
+    for _, batch in enumerate(tqdm(test_dataloader, desc="test")):
+        input_ids, input_mask, segment_ids, label_ids, premise_class_ids = batch
         input_ids = input_ids.to(device)
         input_mask = input_mask.to(device)
-
         gold_class_ids+=list(premise_class_ids.detach().cpu().numpy())
 
-
         with torch.no_grad():
-            logits = model(input_ids, input_mask)
+            logits, _ = model(input_ids, input_mask)
         if len(preds) == 0:
             preds.append(logits.detach().cpu().numpy())
         else:
             preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
-    preds = softmax(preds[0],axis=1)
 
+    preds = softmax(preds[0],axis=1)
     pred_label_3way = np.argmax(preds, axis=1) #dev_examples, 0 means "entailment"
     pred_probs = list(preds[:,0]) #prob for "entailment" class: (#input, #seen_classe)
-    assert len(pred_label_3way) == len(dev_examples)
-    assert len(pred_probs) == len(dev_examples)
-    assert len(gold_class_ids) == len(dev_examples)
+    assert len(pred_label_3way) == len(test_examples)
+    assert len(pred_probs) == len(test_examples)
+    assert len(gold_class_ids) == len(test_examples)
 
 
-    pred_label_3way = np.array(pred_label_3way).reshape(len(dev_examples)//len(train_class_list),len(train_class_list))
-    # print('pred_label_3way:', pred_label_3way[pred_label_3way.shape[0]-5:, :])
-    pred_probs = np.array(pred_probs).reshape(len(dev_examples)//len(train_class_list),len(train_class_list))
-    gold_class_ids = np.array(gold_class_ids).reshape(len(dev_examples)//len(train_class_list),len(train_class_list))
+    pred_label_3way = np.array(pred_label_3way).reshape(len(test_examples)//len(train_class_list),len(train_class_list))
+    pred_probs = np.array(pred_probs).reshape(len(test_examples)//len(train_class_list),len(train_class_list))
+    gold_class_ids = np.array(gold_class_ids).reshape(len(test_examples)//len(train_class_list),len(train_class_list))
     '''verify gold_class_ids per row'''
     rows, cols = gold_class_ids.shape
     for row in range(rows):
@@ -691,8 +719,6 @@ def main():
         else:
             pred_label_ids.append(len(train_class_list))
 
-    # print('pred_label_ids:', pred_label_ids)
-    # print('gold_label_ids:', gold_label_ids)
     assert len(pred_label_ids) == len(gold_label_ids)
     acc_each_round = []
     for round_name_id in round_list:
@@ -709,87 +735,21 @@ def main():
             acc_each_round.append(acc_i)
         else:
             '''ood acc'''
+            gold_binary_list = []
+            pred_binary_list = []
             for ii, gold_label_id in enumerate(gold_label_ids):
-                if test_split_list[gold_label_id] == round_name_id:
-                    round_size+=1
-                    if pred_label_ids[ii]==len(train_class_list):
-                        rount_hit+=1
-            acc_i = rount_hit/round_size
+                gold_binary_list.append(1 if test_split_list[gold_label_id] == round_name_id else 0)
+                pred_binary_list.append(1 if pred_label_ids[ii]==len(train_class_list) else 0)
+            overlap = 0
+            for i in range(len(gold_binary_list)):
+                if gold_binary_list[i] == 1 and pred_binary_list[i]==1:
+                    overlap +=1
+            recall = overlap/(1e-6+sum(gold_binary_list))
+            precision = overlap/(1e-6+sum(pred_binary_list))
+
+            acc_i = 2*recall*precision/(1e-6+recall+precision)
             acc_each_round.append(acc_i)
-    dev_acc = np.mean(acc_each_round)
-
-    if dev_acc > max_dev_acc:
-        max_dev_acc = dev_acc
-        print('\ndev acc:', acc_each_round, '\n')
-
-
-        logger.info("***** Running test *****")
-        logger.info("  Num examples = %d", len(test_examples))
-
-        preds = []
-        gold_class_ids = []
-        for _, batch in enumerate(tqdm(test_dataloader, desc="test")):
-            input_ids, input_mask, segment_ids, label_ids, premise_class_ids = batch
-            input_ids = input_ids.to(device)
-            input_mask = input_mask.to(device)
-            gold_class_ids+=list(premise_class_ids.detach().cpu().numpy())
-
-            with torch.no_grad():
-                logits = model(input_ids, input_mask)
-            if len(preds) == 0:
-                preds.append(logits.detach().cpu().numpy())
-            else:
-                preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
-
-        preds = softmax(preds[0],axis=1)
-        pred_label_3way = np.argmax(preds, axis=1) #dev_examples, 0 means "entailment"
-        pred_probs = list(preds[:,0]) #prob for "entailment" class: (#input, #seen_classe)
-        assert len(pred_label_3way) == len(test_examples)
-        assert len(pred_probs) == len(test_examples)
-        assert len(gold_class_ids) == len(test_examples)
-
-
-        pred_label_3way = np.array(pred_label_3way).reshape(len(test_examples)//len(train_class_list),len(train_class_list))
-        pred_probs = np.array(pred_probs).reshape(len(test_examples)//len(train_class_list),len(train_class_list))
-        gold_class_ids = np.array(gold_class_ids).reshape(len(test_examples)//len(train_class_list),len(train_class_list))
-        '''verify gold_class_ids per row'''
-        rows, cols = gold_class_ids.shape
-        for row in range(rows):
-            assert len(set(gold_class_ids[row,:]))==1
-        gold_label_ids = list(gold_class_ids[:,0])
-        pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
-        pred_max_prob = list(np.amax(pred_probs, axis=1))
-        pred_label_ids = []
-        for idd, seen_class_id in enumerate(pred_label_ids_raw):
-            if pred_label_3way[idd][seen_class_id]==0:
-                pred_label_ids.append(seen_class_id)
-            else:
-                pred_label_ids.append(len(train_class_list))
-
-        assert len(pred_label_ids) == len(gold_label_ids)
-        acc_each_round = []
-        for round_name_id in round_list:
-            #base, n1, n2, ood
-            round_size = 0
-            rount_hit = 0
-            if round_name_id != 'ood':
-                for ii, gold_label_id in enumerate(gold_label_ids):
-                    if test_split_list[gold_label_id] == round_name_id:
-                        round_size+=1
-                        if gold_label_id == pred_label_ids[ii]:
-                            rount_hit+=1
-                acc_i = rount_hit/round_size
-                acc_each_round.append(acc_i)
-            else:
-                '''ood acc'''
-                for ii, gold_label_id in enumerate(gold_label_ids):
-                    if test_split_list[gold_label_id] == round_name_id:
-                        round_size+=1
-                        if pred_label_ids[ii]==len(train_class_list):
-                            rount_hit+=1
-                acc_i = rount_hit/round_size
-                acc_each_round.append(acc_i)
-        final_test_performance = acc_each_round
+    final_test_performance = acc_each_round
 
 
 
