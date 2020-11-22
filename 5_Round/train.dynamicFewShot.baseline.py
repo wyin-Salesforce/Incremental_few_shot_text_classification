@@ -102,18 +102,20 @@ class RobertaForSequenceClassification(nn.Module):
 
 
 class ModelStageTwo(nn.Module):
-    def __init__(self):
+    def __init__(self, tagset_size, roberta_model):
         super(ModelStageTwo, self).__init__()
+        self.classWeight = Parameter(torch.Tensor(tagset_size, bert_hidden_dim))
         self.query_para = nn.Linear(bert_hidden_dim, bert_hidden_dim)
         self.key_para = nn.Linear(bert_hidden_dim, bert_hidden_dim)
         self.phi_avg = Parameter(torch.Tensor(1, bert_hidden_dim))
         self.phi_att = Parameter(torch.Tensor(1, bert_hidden_dim))
         self.γ = Parameter(torch.Tensor(1))
-        self.reset_parameters()
+        self.reset_parameters(roberta_model)
 
-    def reset_parameters(self):
+    def reset_parameters(self, roberta_model):
         nn.init.kaiming_uniform_(self.phi_avg, a=math.sqrt(5))
         nn.init.kaiming_uniform_(self.phi_att, a=math.sqrt(5))
+        self.classWeight = roberta_model.classWeight
 
         #(input_ids, input_mask, model, novel_class_support_reps= novel_class_support_reps, base_class_mapping = original_base_class_idlist)
     def forward(self, input_ids, input_mask, roberta_model, novel_class_support_reps=None, fake_novel_size=None, base_class_mapping=None):
@@ -125,7 +127,7 @@ class ModelStageTwo(nn.Module):
         '''rep for a query batch'''
         normalized_input = roberta_model(input_ids, input_mask, output_rep=True)#hidden_states_single_v2/(1e-8+torch.sqrt(torch.sum(torch.square(hidden_states_single_v2), axis=1, keepdim=True)))
         '''now, build class weights'''
-        init_weight_for_all = roberta_model.classWeight[base_class_mapping] if base_class_mapping is not None else roberta_model.classWeight #the original order changed
+        init_weight_for_all = self.classWeight[base_class_mapping] if base_class_mapping is not None else self.classWeight #the original order changed
         init_normalized_weight_for_all = init_weight_for_all/(1e-8+torch.sqrt(torch.sum(torch.square(init_weight_for_all), axis=1, keepdim=True)))
 
         '''the input are support examples for a fake novel class'''
@@ -713,7 +715,7 @@ def main():
             #     print('mean loss:', mean_loss/count)
     print('stage 1, train supervised classification on base is over.')
     '''now, train the second stage'''
-    model_stage_2 = ModelStageTwo()
+    model_stage_2 = ModelStageTwo(len(base_class_list), model)
     model_stage_2.to(device)
 
     param_optimizer = list(model_stage_2.named_parameters())
