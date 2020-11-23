@@ -215,7 +215,7 @@ class RteProcessor(DataProcessor):
 
             readfile.close()
         '''select 5 examples for base classes'''
-        assert len(base_class_list) ==  20
+        # assert len(base_class_list) ==  20
         for base_class in base_class_list:
             example_candidates = class_2_examples.get(base_class)
             random.shuffle(example_candidates)
