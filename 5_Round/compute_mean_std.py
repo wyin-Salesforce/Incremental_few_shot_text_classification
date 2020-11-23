@@ -38,10 +38,10 @@ def extract(flag):
                 break
         readfile.close()
     assert len(result_lists[0]) == len(result_lists[1])
-    assert len(result_lists[0]) == len(result_lists[2])
+    # assert len(result_lists[0]) == len(result_lists[2])
     final_results = []
     for i in range(len(result_lists[0])):
-        strr = compute([result_lists[0][i]*100.0, result_lists[1][i]*100.0, result_lists[2][i]*100.0])
+        strr = compute([result_lists[0][i]*100.0, result_lists[1][i]*100.0])
         final_results.append(strr)
     print('final_results:', final_results)
 
