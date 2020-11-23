@@ -1,6 +1,6 @@
 export BATCHSIZE=32
 export EPOCHSIZE=5
-export SEED=16 #42, 16, 32
+export SEED=32 #42, 16, 32
 export LEARNINGRATE=1e-6
 
 #running time: 45mins per epoch
@@ -43,7 +43,7 @@ CUDA_VISIBLE_DEVICES=2 python -u train.samecluster.baseline.py \
     --round_name r3 > log.nobase.samecluster.r3.seed.$SEED.txt 2>&1 &
 
 
-CUDA_VISIBLE_DEVICES=6 python -u train.samecluster.baseline.py \
+CUDA_VISIBLE_DEVICES=3 python -u train.samecluster.baseline.py \
     --task_name rte \
     --do_train \
     --do_lower_case \
@@ -55,7 +55,7 @@ CUDA_VISIBLE_DEVICES=6 python -u train.samecluster.baseline.py \
     --seed $SEED \
     --round_name r4 > log.nobase.samecluster.r4.seed.$SEED.txt 2>&1 &
 
-CUDA_VISIBLE_DEVICES=7 python -u train.samecluster.baseline.py \
+CUDA_VISIBLE_DEVICES=4 python -u train.samecluster.baseline.py \
     --task_name rte \
     --do_train \
     --do_lower_case \
