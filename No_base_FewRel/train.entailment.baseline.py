@@ -492,8 +492,8 @@ def examples_to_features(source_examples, label_list, eval_class_list, args, tok
     dev_all_input_ids = torch.tensor([f.input_ids for f in source_features], dtype=torch.long)
     dev_all_input_mask = torch.tensor([f.input_mask for f in source_features], dtype=torch.long)
     dev_all_segment_ids = torch.tensor([f.segment_ids for f in source_features], dtype=torch.long)
-    dev_all_span_a_mask = torch.tensor([f.span_a_mask for f in dev_features], dtype=torch.float)
-    dev_all_span_b_mask = torch.tensor([f.span_b_mask for f in dev_features], dtype=torch.float)
+    dev_all_span_a_mask = torch.tensor([f.span_a_mask for f in source_features], dtype=torch.float)
+    dev_all_span_b_mask = torch.tensor([f.span_b_mask for f in source_features], dtype=torch.float)
     dev_all_label_ids = torch.tensor([f.label_id for f in source_features], dtype=torch.long)
     dev_all_premise_class_ids = torch.tensor([f.premise_class_id for f in source_features], dtype=torch.long)
 
