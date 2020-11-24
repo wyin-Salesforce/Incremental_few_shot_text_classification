@@ -241,7 +241,7 @@ class RteProcessor(DataProcessor):
 
                         '''negative pairs'''
                         negative_class_set = set(class_set_in_this_round)-set([class_name])
-                        for negative_class in random.sample(list(negative_class_set), 5):
+                        for negative_class in random.sample(list(negative_class_set), 1):
                             for hypo_tuple in class_2_examplelist_this_round.get(negative_class):
                                 examples_this_round.append( InputExample(guid=round, text_a=sent, span_a_left=head_left, span_a_right=head_right,span_a_left_v2=hypo_tuple[1], span_a_right_v2=hypo_tuple[2], text_b=hypo_tuple[0], span_b_left=tail_left, span_b_right=tail_right, span_b_left_v2=hypo_tuple[3], span_b_right_v2=hypo_tuple[4], label='non-entailment', premise_class=class_name))
 
