@@ -422,22 +422,24 @@ def convert_examples_to_features(examples, label_list, eval_class_list, max_seq_
         if span_a_left is None or span_b_left is None:
             '''give up this pair'''
             give_up+=1
-            continue
-        else:
-            span_a_mask = [0]*len(input_ids)
-            for i in range(span_a_left, span_a_right):
-                span_a_mask[i]=1
-            span_b_mask = [0]*len(input_ids)
-            for i in range(span_b_left, span_b_right):
-                span_b_mask[i]=1
-            features.append(
-                    InputFeatures(input_ids=input_ids,
-                                  input_mask=input_mask,
-                                  segment_ids=segment_ids,
-                                  span_a_mask = span_a_mask,
-                                  span_b_mask = span_b_mask,
-                                  label_id=label_id,
-                                  premise_class_id = class_map[example.premise_class]))
+            span_a_left, span_a_right = 0,2
+            span_b_left, span_b_right = 0,2
+        #     continue
+        # else:
+        span_a_mask = [0]*len(input_ids)
+        for i in range(span_a_left, span_a_right):
+            span_a_mask[i]=1
+        span_b_mask = [0]*len(input_ids)
+        for i in range(span_b_left, span_b_right):
+            span_b_mask[i]=1
+        features.append(
+                InputFeatures(input_ids=input_ids,
+                              input_mask=input_mask,
+                              segment_ids=segment_ids,
+                              span_a_mask = span_a_mask,
+                              span_b_mask = span_b_mask,
+                              label_id=label_id,
+                              premise_class_id = class_map[example.premise_class]))
     print('give_up:', give_up)
 
     return features
