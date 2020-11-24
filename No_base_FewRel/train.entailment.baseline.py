@@ -740,7 +740,7 @@ def main():
         else:
             preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
 
-    print('preds:', preds)
+    # print('preds:', preds)
     preds = softmax(preds[0],axis=1)
     pred_label_3way = np.argmax(preds, axis=1) #dev_examples, 0 means "entailment"
     pred_probs = list(preds[:,0]) #prob for "entailment" class: (#input, #seen_classe)
