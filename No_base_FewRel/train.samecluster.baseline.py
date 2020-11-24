@@ -16,7 +16,7 @@
 """BERT finetuning runner."""
 
 from __future__ import absolute_import, division, print_function
-
+import json
 import argparse
 import csv
 import logging
@@ -73,11 +73,34 @@ class RobertaForSequenceClassification(nn.Module):
         self.tagset_size = tagset_size
 
         self.roberta_single= RobertaModel.from_pretrained(pretrain_model_dir)
+        self.hidden_layer_0 = nn.Linear(bert_hidden_dim*3, bert_hidden_dim)
+        self.hidden_layer_1 = nn.Linear(bert_hidden_dim*2, bert_hidden_dim)
+        self.hidden_layer_2 = nn.Linear(bert_hidden_dim, bert_hidden_dim)
         self.single_hidden2tag = RobertaClassificationHead(bert_hidden_dim, tagset_size)
 
-    def forward(self, input_ids, input_mask):
+    def forward(self, input_ids, input_mask, span_a_mask, span_b_mask, span_a_mask_v2, span_b_mask_v2):
+        # outputs_single = self.roberta_single(input_ids, input_mask, None)
+        # hidden_states_single = outputs_single[1]#torch.tanh(self.hidden_layer_2(torch.tanh(self.hidden_layer_1(outputs_single[1])))) #(batch, hidden)
+
+
+
         outputs_single = self.roberta_single(input_ids, input_mask, None)
-        hidden_states_single = outputs_single[1]#torch.tanh(self.hidden_layer_2(torch.tanh(self.hidden_layer_1(outputs_single[1])))) #(batch, hidden)
+        output_last_layer_tensor3 = outputs_single[0] #(batch_size, sequence_length, hidden_size)`)
+        span_a_reps = torch.sum(output_last_layer_tensor3*span_a_mask.unsqueeze(2), dim=1) #(batch, hidden)
+        span_b_reps = torch.sum(output_last_layer_tensor3*span_b_mask.unsqueeze(2), dim=1) #(batch, hidden)
+        combined_rep = torch.cat([span_a_reps, span_b_reps, span_a_reps*span_b_reps],dim=1) #(batch, 3*hidden)
+        MLP_input_v1 = torch.tanh(self.hidden_layer_0(combined_rep))#(batch, hidden)
+
+
+        span_a_reps_v2 = torch.sum(output_last_layer_tensor3*span_a_mask_v2.unsqueeze(2), dim=1) #(batch, hidden)
+        span_b_reps_v2 = torch.sum(output_last_layer_tensor3*span_b_mask_v2.unsqueeze(2), dim=1) #(batch, hidden)
+        combined_rep_v2 = torch.cat([span_a_reps_v2, span_b_reps_v2, span_a_reps_v2*span_b_reps_v2],dim=1) #(batch, 3*hidden)
+        MLP_input_v2 = torch.tanh(self.hidden_layer_0(combined_rep_v2))#(batch, hidden)
+
+        MLP_input = torch.cat([MLP_input_v1, MLP_input_v2], axis=1)
+
+        hidden_states_single = torch.tanh(self.hidden_layer_2(torch.tanh(self.hidden_layer_1(MLP_input)))) #(batch, hidden)
+
 
         score_single = self.single_hidden2tag(hidden_states_single) #(batch, tag_set)
         return score_single
@@ -107,7 +130,7 @@ class RobertaClassificationHead(nn.Module):
 class InputExample(object):
     """A single training/test example for simple sequence classification."""
 
-    def __init__(self, guid, text_a, text_b=None, label=None, premise_class=None, hypothesis_class=None):
+    def __init__(self, guid, text_a, span_a_left=None, span_a_right=None,span_a_left_v2=None, span_a_right_v2=None, text_b=None, span_b_left=None, span_b_right=None,span_b_left_v2=None, span_b_right_v2=None, label=None, premise_class=None):
         """Constructs a InputExample.
 
         Args:
@@ -121,23 +144,33 @@ class InputExample(object):
         """
         self.guid = guid
         self.text_a = text_a
+        self.span_a_left = span_a_left
+        self.span_a_right = span_a_right
+        self.span_a_left_v2 = span_a_left_v2
+        self.span_a_right_v2 = span_a_right_v2
+
         self.text_b = text_b
+        self.span_b_left = span_b_left
+        self.span_b_right = span_b_right
+        self.span_b_left_v2 = span_b_left_v2
+        self.span_b_right_v2 = span_b_right_v2
         self.label = label
         self.premise_class = premise_class
-        self.hypothesis_class = hypothesis_class
 
 
 class InputFeatures(object):
     """A single set of features of data."""
 
-    def __init__(self, guid, input_ids, input_mask, segment_ids, label_id, premise_class_id, hypothesis_class_id):
-        self.guid = guid
+    def __init__(self, input_ids, input_mask, segment_ids,span_a_mask, span_b_mask,span_a_mask_v2, span_b_mask_v2, label_id, premise_class_id):
         self.input_ids = input_ids
         self.input_mask = input_mask
         self.segment_ids = segment_ids
+        self.span_a_mask = span_a_mask
+        self.span_b_mask = span_b_mask
+        self.span_a_mask_v2 = span_a_mask_v2
+        self.span_b_mask_v2 = span_b_mask_v2
         self.label_id = label_id
         self.premise_class_id = premise_class_id
-        self.hypothesis_class_id = hypothesis_class_id
 
 
 class DataProcessor(object):
@@ -168,87 +201,79 @@ class RteProcessor(DataProcessor):
         round_indicator_up_to_now = []
         class_2_sentlist_upto_this_round = defaultdict(list)
         for round in round_list:
-            '''first collect the class_2_sentlist in this round'''
+            '''first collect the class set in this round'''
             examples_this_round = []
-            class_2_sentlist_in_this_round = defaultdict(list)
-            filename = '/export/home/Dataset/incrementalFewShotTextClassification/Incremental-few-shot-text-classification-master/dataset/banking77/split/'+round+'/train.txt'
-            readfile = codecs.open(filename, 'r', 'utf-8')
-            for row in readfile:
-                parts = row.strip().split('\t')
-                assert len(parts)==2
-                class_name = parts[0].strip()
-                sent = parts[1].strip()
-                class_2_sentlist_in_this_round[class_name].append(sent)
-            if round == 'base':
-                '''for base classes, we only keep 5 examples'''
-                for key in class_2_sentlist_in_this_round.keys():
-                    truncate_values = class_2_sentlist_in_this_round.get(key)
-                    random.shuffle(truncate_values)
-                    class_2_sentlist_in_this_round[key] = truncate_values[:5]
-            class_2_sentlist_upto_this_round = {**class_2_sentlist_upto_this_round, **class_2_sentlist_in_this_round}
-            readfile.close()
-            class_set_in_this_round = set(class_2_sentlist_in_this_round.keys())
+            class_set_in_this_round = set()
+            class_2_examplelist_this_round = defaultdict(list)
+            filename = '/export/home/Dataset/incrementalFewShotTextClassification/Incremental-few-shot-text-classification-master/dataset/FewRel/split/'+round+'/train.txt'
+            # tup_list = []
+            with open(filename) as json_file:
+                dev_data = json.load(json_file)
+                for class_name, example_list in dev_data.items():
+                    for example in example_list:
+                        sent = ' '.join(example.get('tokens'))
+                        head_left = example.get('h')[2][0][0]
+                        head_right = example.get('h')[2][0][-1]
+                        tail_left = example.get('t')[2][0][0]
+                        tail_right = example.get('t')[2][0][-1]
+                        class_2_examplelist_this_round[class_name].append((sent, head_left, head_right, tail_left, tail_right))
+                    class_set_in_this_round.add(class_name)
+            json_file.close()
+            class_2_sentlist_upto_this_round = {**class_2_sentlist_upto_this_round, **class_2_examplelist_this_round}
             class_list_up_to_now += list(class_set_in_this_round)
             round_indicator_up_to_now+=[round]*len(class_set_in_this_round)
-            '''truncate to 5 for 'base' class'''
-
             '''transform each example into entailment pair'''
-            filename = '/export/home/Dataset/incrementalFewShotTextClassification/Incremental-few-shot-text-classification-master/dataset/banking77/split/'+round+'/train.txt'
-            readfile = codecs.open(filename, 'r', 'utf-8')
-            for row in readfile:
-                parts = row.strip().split('\t')
-                assert len(parts)==2
-                class_name = parts[0].strip()
-                # class_str = ' '.join(class_name.split('_'))
-                example_str = parts[1].strip()
-                '''positive pair'''
-                sent_candidate = class_2_sentlist_in_this_round.get(class_name)
-                assert len(sent_candidate) > 0
-                for hypo_str in sent_candidate:
-                    if hypo_str !=example_str:
-                        examples_this_round.append( InputExample(guid=0, text_a=example_str, text_b=hypo_str, label='entailment', premise_class=class_name, hypothesis_class = class_name))
-                '''negative pairs'''
-                negative_class_set = set(class_set_in_this_round)-set([class_name])
-                for negative_class in negative_class_set:
-                    sent_candidate = class_2_sentlist_upto_this_round.get(negative_class)
-                    assert len(sent_candidate) > 0
-                    for hypo_str in sent_candidate:
-                        examples_this_round.append( InputExample(guid=0, text_a=example_str, text_b=hypo_str, label='non-entailment', premise_class=class_name, hypothesis_class = negative_class))
+            filename = '/export/home/Dataset/incrementalFewShotTextClassification/Incremental-few-shot-text-classification-master/dataset/FewRel/split/'+round+'/train.txt'
+            with open(filename) as json_file:
+                dev_data = json.load(json_file)
+                for class_name, example_list in dev_data.items():
+                    for example in example_list:
+                        sent = ' '.join(example.get('tokens'))
+                        head_left = example.get('h')[2][0][0]
+                        head_right = example.get('h')[2][0][-1]
+                        tail_left = example.get('t')[2][0][0]
+                        tail_right = example.get('t')[2][0][-1]
+                        # tup_list.append((sent, class_name, head_left, head_right, tail_left, tail_right))
+                        '''positive pair'''
+                        for hypo_tuple in class_2_examplelist_this_round.get(class_name):
+                            for _ in range(2):
+                                examples_this_round.append( InputExample(guid=round, text_a=sent, span_a_left=head_left, span_a_right=head_right,span_a_left_v2=hypo_tuple[1], span_a_right_v2=hypo_tuple[2], text_b=hypo_tuple[0], span_b_left=tail_left, span_b_right=tail_right, span_b_left_v2=hypo_tuple[3], span_b_right_v2=hypo_tuple[4], label='entailment', premise_class=class_name))
 
-            readfile.close()
+                        '''negative pairs'''
+                        negative_class_set = set(class_set_in_this_round)-set([class_name])
+                        for negative_class in random.sample(list(negative_class_set), 2):
+                            for hypo_tuple in class_2_examplelist_this_round.get(negative_class):
+                                examples_this_round.append( InputExample(guid=round, text_a=sent, span_a_left=head_left, span_a_right=head_right,span_a_left_v2=hypo_tuple[1], span_a_right_v2=hypo_tuple[2], text_b=hypo_tuple[0], span_b_left=tail_left, span_b_right=tail_right, span_b_left_v2=hypo_tuple[3], span_b_right_v2=hypo_tuple[4], label='non-entailment', premise_class=class_name))
+
+            json_file.close()
             examples_list.append(examples_this_round)
         return examples_list, class_list_up_to_now, round_indicator_up_to_now, class_2_sentlist_upto_this_round
 
 
     def load_dev_or_test(self, round_list, seen_classes, train_class_2_sentlist_upto_this_round, flag):
         examples_rounds = []
-        example_size_list = []
-        instance_id = 0
         for round in round_list:
             examples = []
             instance_size = 0
-            filename = '/export/home/Dataset/incrementalFewShotTextClassification/Incremental-few-shot-text-classification-master/dataset/banking77/split/'+round+'/'+flag+'.txt'
-            readfile = codecs.open(filename, 'r', 'utf-8')
-            for row in readfile:
-                parts = row.strip().split('\t')
-                assert len(parts)==2
-                class_name = parts[0].strip()
-                if round == 'ood':
-                    class_name = 'ood'
-                example_str = parts[1].strip()
+            filename = '/export/home/Dataset/incrementalFewShotTextClassification/Incremental-few-shot-text-classification-master/dataset/FewRel/split/'+round+'/'+flag+'.txt'
+            with open(filename) as json_file:
+                dev_data = json.load(json_file)
+                for class_name, example_list in dev_data.items():
+                    for example in example_list:
+                        sent = ' '.join(example.get('tokens'))
+                        head_left = example.get('h')[2][0][0]
+                        head_right = example.get('h')[2][0][-1]
+                        tail_left = example.get('t')[2][0][0]
+                        tail_right = example.get('t')[2][0][-1]
+                        if round == 'ood':
+                            class_name = 'ood'
+                        for seen_class in seen_classes:
+                            '''each example compares with all seen classes'''
+                            for hypo_tuple in train_class_2_sentlist_upto_this_round.get(seen_class):
+                                examples.append( InputExample(guid=flag, text_a=sent, span_a_left=head_left, span_a_right=head_right,span_a_left_v2=hypo_tuple[1], span_a_right_v2=hypo_tuple[2], text_b=hypo_tuple[0], span_b_left=tail_left, span_b_right=tail_right, span_b_left_v2=hypo_tuple[3], span_b_right_v2=hypo_tuple[4], label='entailment', premise_class=class_name))
 
-                for seen_class in seen_classes:
-                    '''each example compares with all seen classes'''
-                    sent_candidates = train_class_2_sentlist_upto_this_round.get(seen_class)
-                    for hypo_str in sent_candidates:
-                        examples.append(
-                            InputExample(guid=instance_id, text_a=example_str, text_b=hypo_str, label='entailment', premise_class=class_name, hypothesis_class = seen_class))
-                instance_size+=1
-                instance_id+=1
-            readfile.close()
             examples_rounds+=examples
-            example_size_list.append(instance_size)
-        return examples_rounds, instance_id
+        return examples_rounds
 
 
 
@@ -271,7 +296,36 @@ class RteProcessor(DataProcessor):
                 InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
         return examples
 
+def wordpairID_2_tokenpairID(sentence, wordindex_left, wordindex_right, full_token_id_list, tokenizer, sent_1=True):
+    '''pls note that the input indices pair include the b in (a,b), but the output doesn't'''
+    '''first find the position of [2,2]'''
+    position_two_two = 0
+    for i in range(len(full_token_id_list)):
+        if full_token_id_list[i]==2 and full_token_id_list[i+1]==2:
+            position_two_two = i
+            break
+    span = ' '.join(sentence.split()[wordindex_left: wordindex_right+1])
+    if wordindex_left!=0:
+        '''this span is the begining of the sent'''
+        span=' '+span
 
+    span_token_list = tokenizer.tokenize(span)
+    span_id_list = tokenizer.convert_tokens_to_ids(span_token_list)
+    # print('span:', span, 'span_id_list:', span_id_list)
+    if sent_1:
+        # for i in range(wordindex_left, len(full_token_id_list)-len(span_id_list)):
+        for i in range(wordindex_left, position_two_two):
+            if full_token_id_list[i:i+len(span_id_list)] == span_id_list:
+                return i, i+len(span_id_list), span_token_list
+
+        return None, None, span_token_list
+    else:
+        # print('position_two_two:', position_two_two)
+        for i in range(position_two_two+2, len(full_token_id_list)):
+            if full_token_id_list[i:i+len(span_id_list)] == span_id_list:
+                return i, i+len(span_id_list), span_token_list
+
+        return None, None, span_token_list
 
 def convert_examples_to_features(examples, label_list, eval_class_list, max_seq_length,
                                  tokenizer, output_mode,
@@ -297,6 +351,7 @@ def convert_examples_to_features(examples, label_list, eval_class_list, max_seq_
     class_map = {label : i for i, label in enumerate(eval_class_list)}
 
     features = []
+    give_up = 0
     for (ex_index, example) in enumerate(examples):
         if ex_index % 10000 == 0:
             logger.info("Writing example %d of %d" % (ex_index, len(examples)))
@@ -380,15 +435,48 @@ def convert_examples_to_features(examples, label_list, eval_class_list, max_seq_
         else:
             raise KeyError(output_mode)
 
+        span_a_left, span_a_right, span_a_token_list = wordpairID_2_tokenpairID(example.text_a, example.span_a_left, example.span_a_right, input_ids, tokenizer, sent_1=True)
+        span_b_left, span_b_right, span_b_token_list = wordpairID_2_tokenpairID(example.text_a, example.span_b_left, example.span_b_right, input_ids, tokenizer, sent_1=True)
+
+        span_a_left_v2, span_a_right_v2, span_a_token_list_v2 = wordpairID_2_tokenpairID(example.text_b, example.span_a_left_v2, example.span_a_right_v2, input_ids, tokenizer, sent_1=False)
+        span_b_left_v2, span_b_right_v2, span_b_token_list_v2 = wordpairID_2_tokenpairID(example.text_b, example.span_b_left_v2, example.span_b_right_v2, input_ids, tokenizer, sent_1=False)
+
+        # print('span_b_left, span_b_right, span_b_token_list:', span_b_left, span_b_right, span_b_token_list)
+        if span_a_left is None or span_b_left is None or span_a_left_v2 is None or span_b_left_v2 is None:
+            '''give up this pair'''
+            give_up+=1
+            span_a_left, span_a_right = 0,2
+            span_b_left, span_b_right = 0,2
+            span_a_left_v2, span_a_right_v2 = 0,2
+            span_b_left_v2, span_b_right_v2 = 0,2
+        #     continue
+        # else:
+        span_a_mask = [0]*len(input_ids)
+        for i in range(span_a_left, span_a_right):
+            span_a_mask[i]=1
+        span_b_mask = [0]*len(input_ids)
+        for i in range(span_b_left, span_b_right):
+            span_b_mask[i]=1
+
+        span_a_mask_v2 = [0]*len(input_ids)
+        for i in range(span_a_left_v2, span_a_right_v2):
+            span_a_mask_v2[i]=1
+        span_b_mask_v2 = [0]*len(input_ids)
+        for i in range(span_b_left_v2, span_b_right_v2):
+            span_b_mask_v2[i]=1
 
         features.append(
-                InputFeatures(guid = example.guid,
-                              input_ids=input_ids,
+                InputFeatures(input_ids=input_ids,
                               input_mask=input_mask,
                               segment_ids=segment_ids,
+                              span_a_mask = span_a_mask,
+                              span_b_mask = span_b_mask,
+                              span_a_mask_v2 = span_a_mask_v2,
+                              span_b_mask_v2 = span_b_mask_v2,
                               label_id=label_id,
-                              premise_class_id = class_map[example.premise_class],
-                              hypothesis_class_id = class_map[example.hypothesis_class]))
+                              premise_class_id = class_map[example.premise_class]))
+    print('give_up:', give_up)
+
     return features
 
 def _truncate_seq_pair(tokens_a, tokens_b, max_length):
@@ -439,15 +527,17 @@ def examples_to_features(source_examples, label_list, eval_class_list, args, tok
         pad_token=tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0],
         pad_token_segment_id=0)#4 if args.model_type in ['xlnet'] else 0,)
 
-    dev_all_guids = torch.tensor([f.guid for f in source_features], dtype=torch.long)
     dev_all_input_ids = torch.tensor([f.input_ids for f in source_features], dtype=torch.long)
     dev_all_input_mask = torch.tensor([f.input_mask for f in source_features], dtype=torch.long)
     dev_all_segment_ids = torch.tensor([f.segment_ids for f in source_features], dtype=torch.long)
+    dev_all_span_a_mask = torch.tensor([f.span_a_mask for f in source_features], dtype=torch.float)
+    dev_all_span_b_mask = torch.tensor([f.span_b_mask for f in source_features], dtype=torch.float)
+    dev_all_span_a_mask_v2 = torch.tensor([f.span_a_mask_v2 for f in source_features], dtype=torch.float)
+    dev_all_span_b_mask_v2 = torch.tensor([f.span_b_mask_v2 for f in source_features], dtype=torch.float)
     dev_all_label_ids = torch.tensor([f.label_id for f in source_features], dtype=torch.long)
     dev_all_premise_class_ids = torch.tensor([f.premise_class_id for f in source_features], dtype=torch.long)
-    dev_all_hypothesis_class_ids = torch.tensor([f.hypothesis_class_id for f in source_features], dtype=torch.long)
 
-    dev_data = TensorDataset(dev_all_guids, dev_all_input_ids, dev_all_input_mask, dev_all_segment_ids, dev_all_label_ids, dev_all_premise_class_ids, dev_all_hypothesis_class_ids)
+    dev_data = TensorDataset(dev_all_input_ids, dev_all_input_mask, dev_all_segment_ids, dev_all_span_a_mask, dev_all_span_b_mask,dev_all_span_a_mask_v2, dev_all_span_b_mask_v2, dev_all_label_ids, dev_all_premise_class_ids)
     if dataloader_mode=='sequential':
         dev_sampler = SequentialSampler(dev_data)
     else:
@@ -621,7 +711,7 @@ def main():
 
     processor = processors[task_name]()
     output_mode = output_modes[task_name]
-    banking77_class_list, ood_class_set, class_2_split = load_class_names()
+    # banking77_class_list, ood_class_set, class_2_split = load_class_names()
 
     round_list = round_name_2_rounds.get(args.round_name)
     '''load training in list'''
@@ -629,8 +719,8 @@ def main():
     assert len(train_class_list) == len(train_class_2_split_list)
     # assert len(train_class_list) ==  20+(len(round_list)-2)*10
     '''dev and test'''
-    dev_examples, dev_instance_size = processor.load_dev_or_test(round_list, train_class_list, class_2_sentlist_upto_this_round, 'dev')
-    test_examples, test_instance_size = processor.load_dev_or_test(round_list, train_class_list, class_2_sentlist_upto_this_round, 'test')
+    dev_examples = processor.load_dev_or_test(round_list, train_class_list, class_2_sentlist_upto_this_round, 'dev')
+    test_examples = processor.load_dev_or_test(round_list, train_class_list, class_2_sentlist_upto_this_round, 'test')
     print('train size:', [len(train_i) for train_i in train_examples_list], ' dev size:', len(dev_examples), ' test size:', len(test_examples))
     entail_class_list = ['entailment', 'non-entailment']
     eval_class_list = train_class_list+['ood']
@@ -652,9 +742,9 @@ def main():
             for _, batch in enumerate(tqdm(train_dataloader, desc="train|"+round+'|epoch_'+str(epoch_i))):
                 model.train()
                 batch = tuple(t.to(device) for t in batch)
-                _, input_ids, input_mask, _, label_ids, _,_ = batch
+                input_ids, input_mask, _, span_a_mask, span_b_mask,span_a_mask_v2, span_b_mask_v2,label_ids, premise_class_ids = batch
 
-                logits = model(input_ids, input_mask)
+                logits = model(input_ids, input_mask,span_a_mask, span_b_mask, span_a_mask_v2, span_b_mask_v2)
                 loss_fct = CrossEntropyLoss()
                 loss = loss_fct(logits.view(-1, 3), label_ids.view(-1))
                 loss.backward()
@@ -664,77 +754,53 @@ def main():
 
     '''evaluation'''
     model.eval()
-    '''test'''
-    acc_each_round = []
+
+
+    logger.info("***** Running test *****")
+    logger.info("  Num examples = %d", len(test_examples))
+
     preds = []
-    gold_guids = []
-    gold_premise_ids = []
-    gold_hypothesis_ids = []
+    gold_class_ids = []
     for _, batch in enumerate(tqdm(test_dataloader, desc="test")):
-        guids, input_ids, input_mask, _, label_ids, premise_class_ids, hypothesis_class_id = batch
+        input_ids, input_mask, segment_ids, span_a_mask, span_b_mask,span_a_mask_v2, span_b_mask_v2, label_ids, premise_class_ids = batch
         input_ids = input_ids.to(device)
         input_mask = input_mask.to(device)
-
-        gold_guids+=list(guids.detach().cpu().numpy())
-        gold_premise_ids+=list(premise_class_ids.detach().cpu().numpy())
-        gold_hypothesis_ids+=list(hypothesis_class_id.detach().cpu().numpy())
-
+        span_a_mask = span_a_mask.to(device)
+        span_b_mask = span_b_mask.to(device)
+        span_a_mask_v2 = span_a_mask_v2.to(device)
+        span_b_mask_v2 = span_b_mask_v2.to(device)
+        gold_class_ids+=list(premise_class_ids.detach().cpu().numpy())
 
         with torch.no_grad():
-            logits = model(input_ids, input_mask)
+            logits = model(input_ids, input_mask, span_a_mask, span_b_mask, span_a_mask_v2, span_b_mask_v2)
         if len(preds) == 0:
             preds.append(logits.detach().cpu().numpy())
         else:
             preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
-    preds = softmax(preds[0],axis=1)
 
+    # print('preds:', preds)
+    preds = softmax(preds[0],axis=1)
     pred_label_3way = np.argmax(preds, axis=1) #dev_examples, 0 means "entailment"
     pred_probs = list(preds[:,0]) #prob for "entailment" class: (#input, #seen_classe)
     assert len(pred_label_3way) == len(test_examples)
     assert len(pred_probs) == len(test_examples)
-    assert len(gold_premise_ids) == len(test_examples)
-    assert len(gold_hypothesis_ids) == len(test_examples)
-    assert len(gold_guids) == len(test_examples)
+    assert len(gold_class_ids) == len(test_examples)
 
-    guid_2_premise_idlist = defaultdict(list)
-    guid_2_hypoID_2_problist_labellist={}
-    for guid_i, threeway_i, prob_i, premise_i, hypo_i in zip(gold_guids, pred_label_3way, pred_probs, gold_premise_ids, gold_hypothesis_ids):
-        guid_2_premise_idlist[guid_i].append(premise_i)
-        hypoID_2_problist_labellist = guid_2_hypoID_2_problist_labellist.get(guid_i)
-        if hypoID_2_problist_labellist is None:
-            hypoID_2_problist_labellist = {}
-        lists = hypoID_2_problist_labellist.get(hypo_i)
-        if lists is None:
-            lists = [[],[]]
-        lists[0].append(prob_i)
-        lists[1].append(threeway_i)
-        hypoID_2_problist_labellist[hypo_i] = lists
-        guid_2_hypoID_2_problist_labellist[guid_i] = hypoID_2_problist_labellist
 
+    pred_label_3way = np.array(pred_label_3way).reshape(len(test_examples)//len(train_class_list),len(train_class_list))
+    pred_probs = np.array(pred_probs).reshape(len(test_examples)//len(train_class_list),len(train_class_list))
+    gold_class_ids = np.array(gold_class_ids).reshape(len(test_examples)//len(train_class_list),len(train_class_list))
+    '''verify gold_class_ids per row'''
+    rows, cols = gold_class_ids.shape
+    for row in range(rows):
+        assert len(set(gold_class_ids[row,:]))==1
+    gold_label_ids = list(gold_class_ids[:,0])
+    pred_label_ids_raw = list(np.argmax(pred_probs, axis=1))
+    pred_max_prob = list(np.amax(pred_probs, axis=1))
     pred_label_ids = []
-    gold_label_ids = []
-    for guid in range(test_instance_size):
-        assert len(set(guid_2_premise_idlist.get(guid))) == 1
-        gold_label_ids.append(guid_2_premise_idlist.get(guid)[0])
-        '''infer predict label id'''
-        hypoID_2_problist_labellist = guid_2_hypoID_2_problist_labellist.get(guid)
-
-        final_max_mean_prob = 0.0
-        final_hypo_id = -1
-        for hypo_id, problist_labellist in hypoID_2_problist_labellist.items():
-            problist = problist_labellist[0]
-            mean_prob = np.mean(problist)
-            labellist = problist_labellist[1]
-            same_cluter_times = labellist.count(0) #'entailment' is the first label
-            same_cluter=False
-            if same_cluter_times/len(labellist) >0.5:
-                same_cluter=True
-
-            if same_cluter is True and mean_prob > final_max_mean_prob:
-                final_max_mean_prob = mean_prob
-                final_hypo_id = hypo_id
-        if final_hypo_id != -1: # can find a class that it belongs to
-            pred_label_ids.append(final_hypo_id)
+    for idd, seen_class_id in enumerate(pred_label_ids_raw):
+        if pred_label_3way[idd][seen_class_id]==0:
+            pred_label_ids.append(seen_class_id)
         else:
             pred_label_ids.append(len(train_class_list))
 
@@ -767,15 +833,15 @@ def main():
             precision = overlap/(1e-6+sum(pred_binary_list))
             acc_i = 2*recall*precision/(1e-6+recall+precision)
             acc_each_round.append(acc_i)
-
-    print('final_test_performance:', acc_each_round)
+    final_test_performance = acc_each_round
+    print('final_test_performance:', final_test_performance)
 
 if __name__ == "__main__":
     main()
 
 '''
 
-CUDA_VISIBLE_DEVICES=7 python -u train.samecluster.baseline.py --task_name rte --do_train --do_lower_case --num_train_epochs 1 --train_batch_size 16 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 64 --seed 42 --round_name 'r1'
+CUDA_VISIBLE_DEVICES=7 python -u train.entailment.baseline.py --task_name rte --do_train --do_lower_case --num_train_epochs 5 --train_batch_size 16 --eval_batch_size 64 --learning_rate 1e-6 --max_seq_length 64 --seed 42 --round_name 'r1'
 
 
 '''
