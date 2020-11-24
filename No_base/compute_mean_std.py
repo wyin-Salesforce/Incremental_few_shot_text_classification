@@ -27,7 +27,7 @@ def extract(flag):
                  'log.nobase.entailment.'+flag+'.seed.32.txt']
     result_lists = []
     for fil in filenames:
-        readfile = codecs.open('/export/home/workspace/Incremental_few_shot_text_classification/5_Round/'+fil, 'r', 'utf-8')
+        readfile = codecs.open('/export/home/workspace/Incremental_few_shot_text_classification/No_base/'+fil, 'r', 'utf-8')
         for line in readfile:
             line_str  = line.strip()
             if line_str.startswith('final_test_performance'):
