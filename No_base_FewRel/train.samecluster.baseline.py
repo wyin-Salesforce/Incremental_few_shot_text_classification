@@ -747,7 +747,7 @@ def main():
 
                 logits = model(input_ids, input_mask,span_a_mask, span_b_mask, span_a_mask_v2, span_b_mask_v2)
                 loss_fct = CrossEntropyLoss()
-                print('label_ids:', label_ids)
+                # print('label_ids:', label_ids)
                 loss = loss_fct(logits.view(-1, 3), label_ids.view(-1))
                 loss.backward()
                 optimizer.step()
@@ -780,7 +780,7 @@ def main():
         else:
             preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
 
-    print('preds:', preds)
+    # print('preds:', preds)
     preds = softmax(preds[0],axis=1)
     pred_label_3way = np.argmax(preds, axis=1) #dev_examples, 0 means "entailment"
     pred_probs = list(preds[:,0]) #prob for "entailment" class: (#input, #seen_classe)
