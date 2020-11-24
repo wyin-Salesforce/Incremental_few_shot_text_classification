@@ -22,9 +22,9 @@ def compute(test_list):
     return str(average)+'$\\pm$'+str(res)
 
 def extract(flag):
-    filenames = ['log.entail.v2.'+flag+'.seed.42.txt',
-                 'log.entail.v2.'+flag+'.seed.16.txt']
-                 # 'log.entail.v2.'+flag+'.seed.32.txt']
+    filenames = ['log.nobase.entailment.'+flag+'.seed.42.txt',
+                 'log.nobase.entailment.'+flag+'.seed.16.txt',
+                 'log.nobase.entailment.'+flag+'.seed.32.txt']
     result_lists = []
     for fil in filenames:
         readfile = codecs.open('/export/home/workspace/Incremental_few_shot_text_classification/5_Round/'+fil, 'r', 'utf-8')
@@ -41,12 +41,12 @@ def extract(flag):
     # assert len(result_lists[0]) == len(result_lists[2])
     final_results = []
     for i in range(len(result_lists[0])):
-        strr = compute([result_lists[0][i]*100.0, result_lists[1][i]*100.0])
+        strr = compute([result_lists[0][i]*100.0, result_lists[1][i]*100.0, result_lists[2][i]*100.0])
         final_results.append(strr)
     print('final_results:', final_results)
 
 if __name__ == "__main__":
-    extract('base')
+    # extract('base')
     extract('r1')
     extract('r2')
     extract('r3')
