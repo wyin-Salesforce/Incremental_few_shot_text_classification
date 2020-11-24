@@ -74,11 +74,11 @@ class RobertaForSequenceClassification(nn.Module):
 
         self.roberta_single= RobertaModel.from_pretrained(pretrain_model_dir)
         self.hidden_layer_0 = nn.Linear(bert_hidden_dim*3, bert_hidden_dim)
-        self.hidden_layer_1 = nn.Linear(bert_hidden_dim, bert_hidden_dim)
+        self.hidden_layer_1 = nn.Linear(bert_hidden_dim*2, bert_hidden_dim)
         self.hidden_layer_2 = nn.Linear(bert_hidden_dim, bert_hidden_dim)
         self.single_hidden2tag = RobertaClassificationHead(bert_hidden_dim, tagset_size)
 
-    def forward(self, input_ids, input_mask, span_a_mask, span_b_mask):
+    def forward(self, input_ids, input_mask, span_a_mask, span_b_mask, span_a_mask_v2, span_b_mask_v2):
         # outputs_single = self.roberta_single(input_ids, input_mask, None)
         # hidden_states_single = outputs_single[1]#torch.tanh(self.hidden_layer_2(torch.tanh(self.hidden_layer_1(outputs_single[1])))) #(batch, hidden)
 
@@ -89,7 +89,15 @@ class RobertaForSequenceClassification(nn.Module):
         span_a_reps = torch.sum(output_last_layer_tensor3*span_a_mask.unsqueeze(2), dim=1) #(batch, hidden)
         span_b_reps = torch.sum(output_last_layer_tensor3*span_b_mask.unsqueeze(2), dim=1) #(batch, hidden)
         combined_rep = torch.cat([span_a_reps, span_b_reps, span_a_reps*span_b_reps],dim=1) #(batch, 3*hidden)
-        MLP_input = torch.tanh(self.hidden_layer_0(combined_rep))#(batch, hidden)
+        MLP_input_v1 = torch.tanh(self.hidden_layer_0(combined_rep))#(batch, hidden)
+
+
+        span_a_reps_v2 = torch.sum(output_last_layer_tensor3*span_a_mask_v2.unsqueeze(2), dim=1) #(batch, hidden)
+        span_b_reps_v2 = torch.sum(output_last_layer_tensor3*span_b_mask_v2.unsqueeze(2), dim=1) #(batch, hidden)
+        combined_rep_v2 = torch.cat([span_a_reps_v2, span_b_reps_v2, span_a_reps_v2*span_b_reps_v2],dim=1) #(batch, 3*hidden)
+        MLP_input_v2 = torch.tanh(self.hidden_layer_0(combined_rep_v2))#(batch, hidden)
+
+        MLP_input = torch.cat([MLP_input_v1, MLP_input_v2], axis=1)
 
         hidden_states_single = torch.tanh(self.hidden_layer_2(torch.tanh(self.hidden_layer_1(MLP_input)))) #(batch, hidden)
 
@@ -524,10 +532,12 @@ def examples_to_features(source_examples, label_list, eval_class_list, args, tok
     dev_all_segment_ids = torch.tensor([f.segment_ids for f in source_features], dtype=torch.long)
     dev_all_span_a_mask = torch.tensor([f.span_a_mask for f in source_features], dtype=torch.float)
     dev_all_span_b_mask = torch.tensor([f.span_b_mask for f in source_features], dtype=torch.float)
+    dev_all_span_a_mask_v2 = torch.tensor([f.span_a_mask_v2 for f in source_features], dtype=torch.float)
+    dev_all_span_b_mask_v2 = torch.tensor([f.span_b_mask_v2 for f in source_features], dtype=torch.float)
     dev_all_label_ids = torch.tensor([f.label_id for f in source_features], dtype=torch.long)
     dev_all_premise_class_ids = torch.tensor([f.premise_class_id for f in source_features], dtype=torch.long)
 
-    dev_data = TensorDataset(dev_all_input_ids, dev_all_input_mask, dev_all_segment_ids, dev_all_span_a_mask, dev_all_span_b_mask, dev_all_label_ids, dev_all_premise_class_ids)
+    dev_data = TensorDataset(dev_all_input_ids, dev_all_input_mask, dev_all_segment_ids, dev_all_span_a_mask, dev_all_span_b_mask,dev_all_span_a_mask_v2, dev_all_span_b_mask_v2, dev_all_label_ids, dev_all_premise_class_ids)
     if dataloader_mode=='sequential':
         dev_sampler = SequentialSampler(dev_data)
     else:
@@ -732,9 +742,9 @@ def main():
             for _, batch in enumerate(tqdm(train_dataloader, desc="train|"+round+'|epoch_'+str(epoch_i))):
                 model.train()
                 batch = tuple(t.to(device) for t in batch)
-                input_ids, input_mask, _, span_a_mask, span_b_mask,label_ids, premise_class_ids = batch
+                input_ids, input_mask, _, span_a_mask, span_b_mask,span_a_mask_v2, span_b_mask_v2,label_ids, premise_class_ids = batch
 
-                logits = model(input_ids, input_mask,span_a_mask, span_b_mask)
+                logits = model(input_ids, input_mask,span_a_mask, span_b_mask, span_a_mask_v2, span_b_mask_v2)
                 loss_fct = CrossEntropyLoss()
                 loss = loss_fct(logits.view(-1, 3), label_ids.view(-1))
                 loss.backward()
@@ -752,15 +762,17 @@ def main():
     preds = []
     gold_class_ids = []
     for _, batch in enumerate(tqdm(test_dataloader, desc="test")):
-        input_ids, input_mask, segment_ids, span_a_mask, span_b_mask, label_ids, premise_class_ids = batch
+        input_ids, input_mask, segment_ids, span_a_mask, span_b_mask,span_a_mask_v2, span_b_mask_v2, label_ids, premise_class_ids = batch
         input_ids = input_ids.to(device)
         input_mask = input_mask.to(device)
         span_a_mask = span_a_mask.to(device)
         span_b_mask = span_b_mask.to(device)
+        span_a_mask_v2 = span_a_mask_v2.to(device)
+        span_b_mask_v2 = span_b_mask_v2.to(device)
         gold_class_ids+=list(premise_class_ids.detach().cpu().numpy())
 
         with torch.no_grad():
-            logits = model(input_ids, input_mask, span_a_mask, span_b_mask)
+            logits = model(input_ids, input_mask, span_a_mask, span_b_mask, span_a_mask_v2, span_b_mask_v2)
         if len(preds) == 0:
             preds.append(logits.detach().cpu().numpy())
         else:
