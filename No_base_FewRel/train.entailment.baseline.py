@@ -223,7 +223,7 @@ class RteProcessor(DataProcessor):
 
                         '''negative pairs'''
                         negative_class_set = set(class_set_in_this_round)-set([class_name])
-                        for negative_class in negative_class_set:
+                        for negative_class in random.sample(list(negative_class_set), 4):
                             # class_str = ' '.join(negative_class.split('_'))
                             examples_this_round.append( InputExample(guid=round, text_a=sent, span_a_left=head_left, span_a_right=head_right, text_b=negative_class, span_b_left=tail_left, span_b_right=tail_right, label='non-entailment', premise_class=class_name))
             json_file.close()
