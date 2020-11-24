@@ -238,6 +238,7 @@ class RteProcessor(DataProcessor):
                         for hypo_tuple in class_2_examplelist_this_round.get(class_name):
                             for _ in range(5):
                                 examples_this_round.append( InputExample(guid=round, text_a=sent, span_a_left=head_left, span_a_right=head_right,span_a_left_v2=hypo_tuple[1], span_a_right_v2=hypo_tuple[2], text_b=hypo_tuple[0], span_b_left=tail_left, span_b_right=tail_right, span_b_left_v2=hypo_tuple[3], span_b_right_v2=hypo_tuple[4], label='entailment', premise_class=class_name))
+                                examples_this_round.append( InputExample(guid=round, text_a=hypo_tuple[0], span_a_left=hypo_tuple[1], span_a_right=hypo_tuple[2],span_a_left_v2=head_left, span_a_right_v2=head_right, text_b=sent, span_b_left=hypo_tuple[3], span_b_right=hypo_tuple[4], span_b_left_v2=tail_left, span_b_right_v2=tail_right, label='entailment', premise_class=class_name))
 
                         '''negative pairs'''
                         negative_class_set = set(class_set_in_this_round)-set([class_name])
