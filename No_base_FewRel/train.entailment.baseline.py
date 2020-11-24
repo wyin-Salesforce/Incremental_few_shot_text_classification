@@ -219,7 +219,8 @@ class RteProcessor(DataProcessor):
                         tail_right = example.get('t')[2][0][-1]
                         # tup_list.append((sent, class_name, head_left, head_right, tail_left, tail_right))
                         '''positive pair'''
-                        examples_this_round.append( InputExample(guid=round, text_a=sent, span_a_left=head_left, span_a_right=head_right, text_b=class_name, span_b_left=tail_left, span_b_right=tail_right, label='entailment', premise_class=class_name))
+                        for _ in range(4):
+                            examples_this_round.append( InputExample(guid=round, text_a=sent, span_a_left=head_left, span_a_right=head_right, text_b=class_name, span_b_left=tail_left, span_b_right=tail_right, label='entailment', premise_class=class_name))
 
                         '''negative pairs'''
                         negative_class_set = set(class_set_in_this_round)-set([class_name])
