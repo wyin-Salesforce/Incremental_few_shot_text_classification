@@ -246,7 +246,8 @@ class RteProcessor(DataProcessor):
                         head_right = example.get('h')[2][0][-1]
                         tail_left = example.get('t')[2][0][0]
                         tail_right = example.get('t')[2][0][-1]
-
+                        if round == 'ood':
+                            class_name = 'ood'
                         for seen_class in seen_classes:
                             '''each example compares with all seen classes'''
                             examples.append(
