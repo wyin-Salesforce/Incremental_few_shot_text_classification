@@ -438,7 +438,7 @@ def convert_examples_to_features(examples, label_list, eval_class_list, max_seq_
                                   span_b_mask = span_b_mask,
                                   label_id=label_id,
                                   premise_class_id = class_map[example.premise_class]))
-
+    print('give_up:', give_up)
 
     return features
 
