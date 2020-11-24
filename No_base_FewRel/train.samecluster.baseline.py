@@ -746,6 +746,7 @@ def main():
 
                 logits = model(input_ids, input_mask,span_a_mask, span_b_mask, span_a_mask_v2, span_b_mask_v2)
                 loss_fct = CrossEntropyLoss()
+                print('label_ids:', label_ids)
                 loss = loss_fct(logits.view(-1, 3), label_ids.view(-1))
                 loss.backward()
                 optimizer.step()
